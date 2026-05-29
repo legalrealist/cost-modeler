@@ -1,13 +1,9 @@
-import { useMemo, useState } from 'react';
-import { Scale, Share2, RotateCcw, Check, ChevronDown, ChevronRight } from 'lucide-react';
-import { calculate } from '@/lib/calculator';
+import { useState } from 'react';
+import { Scale, Share2, RotateCcw, Check } from 'lucide-react';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
-import { TaskCalculator, computeTraditionalCosts, computeAiCosts } from '@/components/TaskCalculator';
-import { CostPositioning } from '@/components/CostPositioning';
-import { BudgetWorksheet } from '@/components/BudgetWorksheet';
+import { TaskCalculator } from '@/components/TaskCalculator';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function CostModelerPage() {
@@ -15,12 +11,6 @@ export function CostModelerPage() {
     inputs,
     setInputs,
     setGigabytes,
-    budget,
-    setPreset,
-    setOverride,
-    toggleLineItem,
-    setStaffingOverride,
-    resetBudget,
     roleRates,
     setRoleRate,
     taskHours,
@@ -30,20 +20,9 @@ export function CostModelerPage() {
     reset,
   } = useMatterInputs();
   const [copied, setCopied] = useState(false);
-  const [showBudgetWorksheet, setShowBudgetWorksheet] = useState(false);
-
-  const output = useMemo(() => calculate(inputs, budget), [inputs, budget]);
-  const userTraditionalCost = useMemo(
-    () => computeTraditionalCosts(taskHours.traditional, roleRates).totalCost,
-    [taskHours.traditional, roleRates],
-  );
-  const userAiCost = useMemo(
-    () => computeAiCosts(taskHours.ai, roleRates, riskMultipliers.aiEfficiencyReduction, inputs.documentCount).totalCost,
-    [taskHours.ai, roleRates, riskMultipliers.aiEfficiencyReduction, inputs.documentCount],
-  );
 
   const handleShare = async () => {
-    const url = buildShareUrl(inputs, budget);
+    const url = buildShareUrl(inputs);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -126,31 +105,6 @@ export function CostModelerPage() {
                   onRoleRateChange={setRoleRate}
                 />
 
-                {/* Vendor line-item budget (collapsible) */}
-                <CollapsibleSection
-                  title="Vendor line-item budget"
-                  subtitle="Line items organized by how invoices arrive"
-                  open={showBudgetWorksheet}
-                  onToggle={() => setShowBudgetWorksheet(!showBudgetWorksheet)}
-                >
-                  <BudgetWorksheet
-                    output={output}
-                    budget={budget}
-                    onPresetChange={setPreset}
-                    onToggleItem={toggleLineItem}
-                    onOverride={setOverride}
-                    onStaffingOverride={setStaffingOverride}
-                    onResetBudget={resetBudget}
-                  />
-                </CollapsibleSection>
-
-                {/* Market positioning */}
-                <CostPositioning
-                  output={output}
-                  userTraditionalCost={userTraditionalCost}
-                  userAiCost={userAiCost}
-                />
-
                 <Disclaimer />
               </div>
             </div>
@@ -178,50 +132,6 @@ function getRiskLabel(matterType: string, defensibility: string): string {
     'compliance:low': 'Minimal oversight',
   };
   return labels[`${matterType}:${defensibility}`] ?? 'Standard oversight';
-}
-
-function CollapsibleSection({
-  title,
-  subtitle,
-  open,
-  onToggle,
-  children,
-}: {
-  title: string;
-  subtitle: string;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Card>
-      <button
-        type="button"
-        onClick={onToggle}
-        className="w-full text-left"
-        aria-expanded={open}
-      >
-        <CardHeader className="hover:bg-secondary/30 transition-colors rounded-t-lg">
-          <CardTitle className="text-lg flex items-center gap-2">
-            {open ? (
-              <ChevronDown className="h-4 w-4" />
-            ) : (
-              <ChevronRight className="h-4 w-4" />
-            )}
-            {title}
-            <span className="text-sm font-normal text-muted-foreground ml-2">
-              {subtitle}
-            </span>
-          </CardTitle>
-        </CardHeader>
-      </button>
-      {open && (
-        <CardContent className="space-y-6">
-          {children}
-        </CardContent>
-      )}
-    </Card>
-  );
 }
 
 function Disclaimer() {
