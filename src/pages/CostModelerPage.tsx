@@ -17,6 +17,7 @@ export function CostModelerPage() {
     riskMultipliers,
     setTraditionalTaskHour,
     setAiTaskHour,
+    resetTaskCalculator,
     reset,
   } = useMatterInputs();
   const [copied, setCopied] = useState(false);
@@ -99,10 +100,12 @@ export function CostModelerPage() {
                   aiTaskHours={taskHours.ai}
                   roleRates={roleRates}
                   aiEfficiency={riskMultipliers.aiEfficiencyReduction}
+                  privilegeFraction={inputs.privilegeFraction}
                   riskLabel={getRiskLabel(inputs.matterType, inputs.defensibility)}
                   onTraditionalTaskChange={setTraditionalTaskHour}
                   onAiTaskChange={setAiTaskHour}
                   onRoleRateChange={setRoleRate}
+                  onResetTaskHours={resetTaskCalculator}
                 />
 
                 <Disclaimer />

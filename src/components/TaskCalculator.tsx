@@ -35,10 +35,12 @@ export interface TaskCalculatorProps {
   aiTaskHours: AiTaskHours;
   roleRates: Record<StaffingRole, number>;
   aiEfficiency: number;
+  privilegeFraction: number;
   riskLabel?: string;
   onTraditionalTaskChange: (key: string, value: number) => void;
   onAiTaskChange: (key: string, value: number) => void;
   onRoleRateChange: (role: StaffingRole, value: number) => void;
+  onResetTaskHours?: () => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -116,8 +118,9 @@ export function computeAiCosts(
   rates: Record<StaffingRole, number>,
   aiEfficiency: number,
   docCount: number,
+  privilegeFraction = 0.08,
 ): CostBreakdown {
-  const privilegeDocs = Math.round(docCount * 0.08);
+  const privilegeDocs = Math.round(docCount * privilegeFraction);
   const keyDocs = Math.round(docCount * 0.02);
 
   const juniorHours =
@@ -329,11 +332,13 @@ function CostCard({
   breakdown,
   subtitle,
   isAi,
+  docCount,
 }: {
   title: string;
   breakdown: CostBreakdown;
   subtitle?: string;
   isAi?: boolean;
+  docCount?: number;
 }) {
   return (
     <Card className="flex-1">
@@ -344,13 +349,17 @@ function CostCard({
         )}
       </CardHeader>
       <CardContent className="space-y-2">
-        {/* Total cost */}
         <div className="text-2xl font-bold font-mono">
           ${Math.round(breakdown.totalCost).toLocaleString('en-US')}
         </div>
         <div className="text-[11px] text-muted-foreground">
           {Math.round(breakdown.totalHours).toLocaleString('en-US')} total hours
           {isAi && ' + AI processing'}
+          {docCount && docCount > 0 && (
+            <span className="ml-2">
+              · ${(breakdown.totalCost / docCount).toFixed(2)}/doc
+            </span>
+          )}
         </div>
 
         {/* Breakdown */}
@@ -399,23 +408,24 @@ export function TaskCalculator({
   aiTaskHours,
   roleRates,
   aiEfficiency,
+  privilegeFraction,
   riskLabel,
   onTraditionalTaskChange,
   onAiTaskChange,
   onRoleRateChange,
+  onResetTaskHours,
 }: TaskCalculatorProps) {
   const t = traditionalTaskHours;
   const a = aiTaskHours;
   const eff = aiEfficiency;
 
-  // Compute costs
   const traditionalBreakdown = useMemo(
     () => computeTraditionalCosts(t, roleRates),
     [t, roleRates],
   );
   const aiBreakdown = useMemo(
-    () => computeAiCosts(a, roleRates, eff, docCount),
-    [a, roleRates, eff, docCount],
+    () => computeAiCosts(a, roleRates, eff, docCount, privilegeFraction),
+    [a, roleRates, eff, docCount, privilegeFraction],
   );
 
   const savings = traditionalBreakdown.totalCost - aiBreakdown.totalCost;
@@ -424,7 +434,6 @@ export function TaskCalculator({
       ? (savings / traditionalBreakdown.totalCost) * 100
       : 0;
 
-  // Total human hours for summary rows
   const traditionalTotalHours =
     t.initialReview +
     t.secondLevelReview +
@@ -440,8 +449,7 @@ export function TaskCalculator({
     aiBreakdown.roleHours.seniorAssociate +
     aiBreakdown.roleHours.partner;
 
-  // Efficiency badge text
-  const effBadge = `${Math.round((1 - eff) * 100)}% faster`;
+  const effBadge = eff < 1.0 ? `${Math.round((1 - eff) * 100)}% faster` : undefined;
 
   return (
     <div className="space-y-6">
@@ -450,7 +458,18 @@ export function TaskCalculator({
       {/* ------------------------------------------------------------------ */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Task hours & allocation</CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Task hours & allocation</CardTitle>
+            {onResetTaskHours && (
+              <button
+                type="button"
+                onClick={onResetTaskHours}
+                className="text-xs text-muted-foreground hover:text-foreground underline"
+              >
+                Reset hours
+              </button>
+            )}
+          </div>
           <p className="text-xs text-muted-foreground">
             Click any hour value to edit. Tasks are allocated to roles per
             industry-standard staffing splits.
@@ -679,12 +698,14 @@ export function TaskCalculator({
             title="Traditional"
             breakdown={traditionalBreakdown}
             subtitle="Full human review workflow"
+            docCount={docCount}
           />
           <CostCard
             title="AI-Enhanced"
             breakdown={aiBreakdown}
             subtitle="AI processing + human QC"
             isAi
+            docCount={docCount}
           />
         </div>
 
