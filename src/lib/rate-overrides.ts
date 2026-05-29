@@ -238,14 +238,14 @@ export function staffingFromTaskHours(
     {
       role: 'juniorAssociate',
       hours: Math.ceil(
-        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.secondLevelKeyDocIdentification) * 0.5,
+        t.secondLevelReview * 0.6 + t.secondLevelPrivilegeReview * 0.6 + t.secondLevelPrivilegeLogDrafting * 0.6 + t.secondLevelKeyDocIdentification * 0.4,
       ),
       rate: DEFAULT_ROLE_RATES.juniorAssociate,
     },
     {
       role: 'seniorAssociate',
       hours: Math.ceil(
-        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.keyDocIdentification + t.secondLevelKeyDocIdentification) * 0.5,
+        t.secondLevelReview * 0.4 + t.secondLevelPrivilegeReview * 0.4 + t.secondLevelPrivilegeLogDrafting * 0.4 + t.secondLevelKeyDocIdentification * 0.6 + t.keyDocIdentification * 0.5,
       ),
       rate: DEFAULT_ROLE_RATES.seniorAssociate,
     },
@@ -268,7 +268,6 @@ export function aiStaffingFromTaskHours(
 ): StaffingRow[] {
   const a = taskHours.ai;
   const rm = riskMultipliers;
-  const secondLevelTotal = a.secondLevelReview + a.secondLevelPrivilegeReview + a.secondLevelPrivilegeLogDrafting + a.secondLevelKeyDocIdentification;
   return [
     {
       role: 'contractAttorney',
@@ -277,12 +276,16 @@ export function aiStaffingFromTaskHours(
     },
     {
       role: 'juniorAssociate',
-      hours: Math.ceil(secondLevelTotal * 0.5 * rm.aiEfficiencyReduction),
+      hours: Math.ceil(
+        (a.secondLevelReview * 0.6 + a.secondLevelPrivilegeReview * 0.6 + a.secondLevelPrivilegeLogDrafting * 0.6 + a.secondLevelKeyDocIdentification * 0.4) * rm.aiEfficiencyReduction,
+      ),
       rate: DEFAULT_ROLE_RATES.juniorAssociate,
     },
     {
       role: 'seniorAssociate',
-      hours: Math.ceil(secondLevelTotal * 0.5 * rm.aiEfficiencyReduction),
+      hours: Math.ceil(
+        (a.secondLevelReview * 0.4 + a.secondLevelPrivilegeReview * 0.4 + a.secondLevelPrivilegeLogDrafting * 0.4 + a.secondLevelKeyDocIdentification * 0.6) * rm.aiEfficiencyReduction,
+      ),
       rate: DEFAULT_ROLE_RATES.seniorAssociate,
     },
     {
@@ -308,7 +311,7 @@ export function defaultTraditionalStaffing(docCount: number): StaffingRow[] {
     {
       role: 'juniorAssociate',
       hours: scaleHours(
-        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.secondLevelKeyDocIdentification) * 0.5,
+        t.secondLevelReview * 0.6 + t.secondLevelPrivilegeReview * 0.6 + t.secondLevelPrivilegeLogDrafting * 0.6 + t.secondLevelKeyDocIdentification * 0.4,
         docCount,
       ),
       rate: DEFAULT_ROLE_RATES.juniorAssociate,
@@ -316,7 +319,7 @@ export function defaultTraditionalStaffing(docCount: number): StaffingRow[] {
     {
       role: 'seniorAssociate',
       hours: scaleHours(
-        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.keyDocIdentification + t.secondLevelKeyDocIdentification) * 0.5,
+        t.secondLevelReview * 0.4 + t.secondLevelPrivilegeReview * 0.4 + t.secondLevelPrivilegeLogDrafting * 0.4 + t.secondLevelKeyDocIdentification * 0.6 + t.keyDocIdentification * 0.5,
         docCount,
       ),
       rate: DEFAULT_ROLE_RATES.seniorAssociate,
@@ -329,13 +332,8 @@ export function defaultTraditionalStaffing(docCount: number): StaffingRow[] {
   ];
 }
 
-/**
- * Default staffing for AI-enhanced workflow.
- * Contract attorneys replaced by AI; remaining roles get 25% efficiency gain.
- */
 export function defaultAiStaffing(docCount: number): StaffingRow[] {
   const a = AI_TASK_HOURS;
-  const secondLevelTotal = a.secondLevelReview + a.secondLevelPrivilegeReview + a.secondLevelPrivilegeLogDrafting + a.secondLevelKeyDocIdentification;
   return [
     {
       role: 'contractAttorney',
@@ -344,12 +342,18 @@ export function defaultAiStaffing(docCount: number): StaffingRow[] {
     },
     {
       role: 'juniorAssociate',
-      hours: scaleHours(secondLevelTotal * 0.5 * AI_EFFICIENCY_REDUCTION, docCount),
+      hours: scaleHours(
+        (a.secondLevelReview * 0.6 + a.secondLevelPrivilegeReview * 0.6 + a.secondLevelPrivilegeLogDrafting * 0.6 + a.secondLevelKeyDocIdentification * 0.4) * AI_EFFICIENCY_REDUCTION,
+        docCount,
+      ),
       rate: DEFAULT_ROLE_RATES.juniorAssociate,
     },
     {
       role: 'seniorAssociate',
-      hours: scaleHours(secondLevelTotal * 0.5 * AI_EFFICIENCY_REDUCTION, docCount),
+      hours: scaleHours(
+        (a.secondLevelReview * 0.4 + a.secondLevelPrivilegeReview * 0.4 + a.secondLevelPrivilegeLogDrafting * 0.4 + a.secondLevelKeyDocIdentification * 0.6) * AI_EFFICIENCY_REDUCTION,
+        docCount,
+      ),
       rate: DEFAULT_ROLE_RATES.seniorAssociate,
     },
     {

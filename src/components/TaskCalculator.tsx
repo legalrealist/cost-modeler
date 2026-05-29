@@ -85,18 +85,16 @@ export function computeTraditionalCosts(
     contractAttorney:
       t.initialReview + t.privilegeReview + t.privilegeLogDrafting,
     juniorAssociate:
-      (t.secondLevelReview +
-        t.secondLevelPrivilegeReview +
-        t.secondLevelPrivilegeLogDrafting +
-        t.secondLevelKeyDocIdentification) *
-      0.5,
+      t.secondLevelReview * 0.6 +
+      t.secondLevelPrivilegeReview * 0.6 +
+      t.secondLevelPrivilegeLogDrafting * 0.6 +
+      t.secondLevelKeyDocIdentification * 0.4,
     seniorAssociate:
-      (t.secondLevelReview +
-        t.secondLevelPrivilegeReview +
-        t.secondLevelPrivilegeLogDrafting +
-        t.keyDocIdentification +
-        t.secondLevelKeyDocIdentification) *
-      0.5,
+      t.secondLevelReview * 0.4 +
+      t.secondLevelPrivilegeReview * 0.4 +
+      t.secondLevelPrivilegeLogDrafting * 0.4 +
+      t.secondLevelKeyDocIdentification * 0.6 +
+      t.keyDocIdentification * 0.5,
     partner: t.keyDocIdentification * 0.5,
   };
 
@@ -122,16 +120,21 @@ export function computeAiCosts(
   const privilegeDocs = Math.round(docCount * 0.08);
   const keyDocs = Math.round(docCount * 0.02);
 
-  const secondLevelTotal =
-    a.secondLevelReview +
-    a.secondLevelPrivilegeReview +
-    a.secondLevelPrivilegeLogDrafting +
-    a.secondLevelKeyDocIdentification;
+  const juniorHours =
+    (a.secondLevelReview * 0.6 +
+      a.secondLevelPrivilegeReview * 0.6 +
+      a.secondLevelPrivilegeLogDrafting * 0.6 +
+      a.secondLevelKeyDocIdentification * 0.4) * aiEfficiency;
+  const seniorHours =
+    (a.secondLevelReview * 0.4 +
+      a.secondLevelPrivilegeReview * 0.4 +
+      a.secondLevelPrivilegeLogDrafting * 0.4 +
+      a.secondLevelKeyDocIdentification * 0.6) * aiEfficiency;
 
   const roleHours: RoleHours = {
     contractAttorney: 0,
-    juniorAssociate: secondLevelTotal * 0.5 * aiEfficiency,
-    seniorAssociate: secondLevelTotal * 0.5 * aiEfficiency,
+    juniorAssociate: juniorHours,
+    seniorAssociate: seniorHours,
     partner: a.secondLevelKeyDocIdentification * 0.5,
   };
 
@@ -497,7 +500,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onTraditionalTaskChange('secondLevelReview', v)
                   }
-                  allocation={`Junior: ${(t.secondLevelReview * 0.5).toFixed(0)} hrs | Senior: ${(t.secondLevelReview * 0.5).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(t.secondLevelReview * 0.6).toFixed(0)} hrs | Senior: ${(t.secondLevelReview * 0.4).toFixed(0)} hrs`}
                 />
                 <TaskRow
                   label="Second Level Privilege Review"
@@ -505,7 +508,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onTraditionalTaskChange('secondLevelPrivilegeReview', v)
                   }
-                  allocation={`Junior: ${(t.secondLevelPrivilegeReview * 0.5).toFixed(0)} hrs | Senior: ${(t.secondLevelPrivilegeReview * 0.5).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(t.secondLevelPrivilegeReview * 0.6).toFixed(0)} hrs | Senior: ${(t.secondLevelPrivilegeReview * 0.4).toFixed(0)} hrs`}
                 />
                 <TaskRow
                   label="Second Level Privilege Log Drafting"
@@ -513,7 +516,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onTraditionalTaskChange('secondLevelPrivilegeLogDrafting', v)
                   }
-                  allocation={`Junior: ${(t.secondLevelPrivilegeLogDrafting * 0.5).toFixed(0)} hrs | Senior: ${(t.secondLevelPrivilegeLogDrafting * 0.5).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(t.secondLevelPrivilegeLogDrafting * 0.6).toFixed(0)} hrs | Senior: ${(t.secondLevelPrivilegeLogDrafting * 0.4).toFixed(0)} hrs`}
                 />
                 <TaskRow
                   label="Second Level Key Doc ID"
@@ -524,7 +527,7 @@ export function TaskCalculator({
                       v,
                     )
                   }
-                  allocation={`Junior: ${(t.secondLevelKeyDocIdentification * 0.5).toFixed(0)} hrs | Senior: ${(t.secondLevelKeyDocIdentification * 0.5).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(t.secondLevelKeyDocIdentification * 0.4).toFixed(0)} hrs | Senior: ${(t.secondLevelKeyDocIdentification * 0.6).toFixed(0)} hrs`}
                 />
               </TaskGroup>
 
@@ -580,7 +583,7 @@ export function TaskCalculator({
                   label="Second Level Review"
                   value={a.secondLevelReview}
                   onChange={(v) => onAiTaskChange('secondLevelReview', v)}
-                  allocation={`Junior: ${(a.secondLevelReview * 0.5 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelReview * 0.5 * eff).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(a.secondLevelReview * 0.6 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelReview * 0.4 * eff).toFixed(0)} hrs`}
                   efficiencyBadge={effBadge}
                 />
                 <TaskRow
@@ -589,7 +592,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onAiTaskChange('secondLevelPrivilegeReview', v)
                   }
-                  allocation={`Junior: ${(a.secondLevelPrivilegeReview * 0.5 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelPrivilegeReview * 0.5 * eff).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(a.secondLevelPrivilegeReview * 0.6 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelPrivilegeReview * 0.4 * eff).toFixed(0)} hrs`}
                   efficiencyBadge={effBadge}
                 />
                 <TaskRow
@@ -598,7 +601,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onAiTaskChange('secondLevelPrivilegeLogDrafting', v)
                   }
-                  allocation={`Junior: ${(a.secondLevelPrivilegeLogDrafting * 0.5 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelPrivilegeLogDrafting * 0.5 * eff).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(a.secondLevelPrivilegeLogDrafting * 0.6 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelPrivilegeLogDrafting * 0.4 * eff).toFixed(0)} hrs`}
                   efficiencyBadge={effBadge}
                 />
                 <TaskRow
@@ -607,7 +610,7 @@ export function TaskCalculator({
                   onChange={(v) =>
                     onAiTaskChange('secondLevelKeyDocIdentification', v)
                   }
-                  allocation={`Junior: ${(a.secondLevelKeyDocIdentification * 0.5 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelKeyDocIdentification * 0.5 * eff).toFixed(0)} hrs | Partner: ${(a.secondLevelKeyDocIdentification * 0.5).toFixed(0)} hrs`}
+                  allocation={`Junior: ${(a.secondLevelKeyDocIdentification * 0.4 * eff).toFixed(0)} hrs | Senior: ${(a.secondLevelKeyDocIdentification * 0.6 * eff).toFixed(0)} hrs | Partner: ${(a.secondLevelKeyDocIdentification * 0.5).toFixed(0)} hrs`}
                   efficiencyBadge={effBadge}
                 />
               </TaskGroup>
