@@ -234,14 +234,6 @@ export const OTHER_RATES = {
     note: 'Per-page Bates-stamping and TIFF conversion fees on legacy platforms.',
   } satisfies PricedRange,
 
-  privilegeLogPerEntry: {
-    low: 5,
-    high: 15,
-    unit: '$/entry',
-    source: 'DECOVER_AI_2026',
-    note: 'Per-entry privilege log preparation under legacy pricing.',
-  } satisfies PricedRange,
-
   projectManagementPerHour: {
     low: 200,
     high: 300,
@@ -326,8 +318,6 @@ export const CORPUS_MIXES: Record<CorpusMix['id'], CorpusMix> = {
     source: 'DWR_2025',
   },
 };
-
-export const DEFAULT_CORPUS_MIX: CorpusMix['id'] = 'mixed';
 
 // ---------------------------------------------------------------------------
 // Recall benchmarks (informational, not used in cost math)
