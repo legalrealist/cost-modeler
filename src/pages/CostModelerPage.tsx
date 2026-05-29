@@ -40,7 +40,7 @@ export function CostModelerPage() {
           <div className="container flex items-center justify-between py-4">
             <div className="flex items-center gap-2 font-semibold">
               <Scale className="h-5 w-5" />
-              <span>Document Review Cost Modeler</span>
+              <span>eDiscovery Cost Calculator</span>
             </div>
             <a
               href="https://legalhack.io"
@@ -56,7 +56,7 @@ export function CostModelerPage() {
             {/* Intro */}
             <div className="mb-8">
               <h1 className="text-2xl font-bold tracking-tight">
-                Document review cost calculator
+                eDiscovery cost calculator
               </h1>
               <p className="text-muted-foreground mt-2 max-w-3xl">
                 Compare traditional human review vs AI-enhanced workflows. Configure task hours,
