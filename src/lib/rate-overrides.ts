@@ -83,7 +83,7 @@ export const DEFAULT_ROLE_RATES: Record<StaffingRole, number> = {
  */
 const BASE_DOC_COUNT = 100_000;
 
-const TRADITIONAL_TASK_HOURS = {
+export const TRADITIONAL_TASK_HOURS = {
   initialReview: 1000,
   secondLevelReview: 800,
   privilegeReview: 100,
@@ -94,17 +94,203 @@ const TRADITIONAL_TASK_HOURS = {
   secondLevelKeyDocIdentification: 80,
 };
 
-const AI_TASK_HOURS = {
+export const AI_TASK_HOURS = {
   secondLevelReview: 800,
   secondLevelPrivilegeReview: 333,
   secondLevelPrivilegeLogDrafting: 167,
   secondLevelKeyDocIdentification: 80,
 };
 
-const AI_EFFICIENCY_REDUCTION = 0.75;
+export const AI_EFFICIENCY_REDUCTION = 0.75;
 
 function scaleHours(baseHours: number, docCount: number): number {
   return Math.ceil(baseHours * (docCount / BASE_DOC_COUNT));
+}
+
+// ---------------------------------------------------------------------------
+// Risk multipliers — scale task hours by matter type + defensibility
+// ---------------------------------------------------------------------------
+
+export type RiskMatterType =
+  | 'adversarial'
+  | 'investigation'
+  | 'regulatory'
+  | 'post_production'
+  | 'compliance';
+
+export type RiskDefensibility = 'high' | 'standard' | 'low';
+
+export interface RiskMultipliers {
+  /** Multiplier on second-level task hours (0.7 – 1.5) */
+  secondLevelReview: number;
+  /** Multiplier on privilege-related tasks (0 – 1.5) */
+  privilegeReview: number;
+  /** Multiplier on partner hours (0 – 2.0) */
+  partnerInvolvement: number;
+  /** 0.75 = 25% faster, 1.0 = no efficiency gain */
+  aiEfficiencyReduction: number;
+}
+
+const DEFAULT_RISK: RiskMultipliers = {
+  secondLevelReview: 1.0,
+  privilegeReview: 1.0,
+  partnerInvolvement: 1.0,
+  aiEfficiencyReduction: 0.75,
+};
+
+const RISK_PROFILES: Record<string, RiskMultipliers> = {
+  'adversarial:high':     { secondLevelReview: 1.5, privilegeReview: 1.5, partnerInvolvement: 2.0, aiEfficiencyReduction: 1.0 },
+  'adversarial:standard': { secondLevelReview: 1.2, privilegeReview: 1.2, partnerInvolvement: 1.5, aiEfficiencyReduction: 0.85 },
+  'adversarial:low':      { secondLevelReview: 1.0, privilegeReview: 1.0, partnerInvolvement: 1.0, aiEfficiencyReduction: 0.75 },
+  'regulatory:high':      { secondLevelReview: 1.3, privilegeReview: 1.3, partnerInvolvement: 1.5, aiEfficiencyReduction: 0.9 },
+  'regulatory:standard':  { secondLevelReview: 1.0, privilegeReview: 1.0, partnerInvolvement: 1.0, aiEfficiencyReduction: 0.8 },
+  'investigation:standard': { secondLevelReview: 1.0, privilegeReview: 1.0, partnerInvolvement: 1.0, aiEfficiencyReduction: 0.75 },
+  'investigation:low':    { secondLevelReview: 0.7, privilegeReview: 0.7, partnerInvolvement: 0.5, aiEfficiencyReduction: 0.75 },
+};
+
+/** "any defensibility" overrides for matter types where defensibility doesn't matter */
+const RISK_ANY_DEFENSIBILITY: Partial<Record<RiskMatterType, RiskMultipliers>> = {
+  post_production: { secondLevelReview: 0.5, privilegeReview: 0,   partnerInvolvement: 0,   aiEfficiencyReduction: 0.75 },
+  compliance:      { secondLevelReview: 0.5, privilegeReview: 0.3, partnerInvolvement: 0.3, aiEfficiencyReduction: 0.75 },
+};
+
+/**
+ * Look up risk multipliers for a given matter type and defensibility level.
+ * Falls back to sensible defaults when the combination isn't explicitly mapped.
+ */
+export function getRiskMultipliers(
+  matterType: RiskMatterType,
+  defensibility: RiskDefensibility,
+): RiskMultipliers {
+  // Check "any defensibility" overrides first
+  const anyDef = RISK_ANY_DEFENSIBILITY[matterType];
+  if (anyDef) return { ...anyDef };
+
+  // Check specific combination
+  const key = `${matterType}:${defensibility}`;
+  const profile = RISK_PROFILES[key];
+  if (profile) return { ...profile };
+
+  return { ...DEFAULT_RISK };
+}
+
+// ---------------------------------------------------------------------------
+// TaskHoursState — editable task hours for both workflows
+// ---------------------------------------------------------------------------
+
+export interface TaskHoursState {
+  traditional: typeof TRADITIONAL_TASK_HOURS;
+  ai: typeof AI_TASK_HOURS;
+}
+
+/**
+ * Compute default task hours scaled by doc count and adjusted by risk multipliers.
+ * The base hours (at 100K docs) are TRADITIONAL_TASK_HOURS and AI_TASK_HOURS.
+ */
+export function getDefaultTaskHours(
+  docCount: number,
+  riskMultipliers: RiskMultipliers,
+): TaskHoursState {
+  const rm = riskMultipliers;
+
+  const traditional = {
+    initialReview: scaleHours(TRADITIONAL_TASK_HOURS.initialReview, docCount),
+    secondLevelReview: scaleHours(TRADITIONAL_TASK_HOURS.secondLevelReview * rm.secondLevelReview, docCount),
+    privilegeReview: scaleHours(TRADITIONAL_TASK_HOURS.privilegeReview * rm.privilegeReview, docCount),
+    secondLevelPrivilegeReview: scaleHours(TRADITIONAL_TASK_HOURS.secondLevelPrivilegeReview * rm.privilegeReview, docCount),
+    privilegeLogDrafting: scaleHours(TRADITIONAL_TASK_HOURS.privilegeLogDrafting * rm.privilegeReview, docCount),
+    secondLevelPrivilegeLogDrafting: scaleHours(TRADITIONAL_TASK_HOURS.secondLevelPrivilegeLogDrafting * rm.privilegeReview, docCount),
+    keyDocIdentification: scaleHours(TRADITIONAL_TASK_HOURS.keyDocIdentification, docCount),
+    secondLevelKeyDocIdentification: scaleHours(TRADITIONAL_TASK_HOURS.secondLevelKeyDocIdentification, docCount),
+  };
+
+  const ai = {
+    secondLevelReview: scaleHours(AI_TASK_HOURS.secondLevelReview * rm.secondLevelReview, docCount),
+    secondLevelPrivilegeReview: scaleHours(AI_TASK_HOURS.secondLevelPrivilegeReview * rm.privilegeReview, docCount),
+    secondLevelPrivilegeLogDrafting: scaleHours(AI_TASK_HOURS.secondLevelPrivilegeLogDrafting * rm.privilegeReview, docCount),
+    secondLevelKeyDocIdentification: scaleHours(AI_TASK_HOURS.secondLevelKeyDocIdentification, docCount),
+  };
+
+  return { traditional, ai };
+}
+
+// ---------------------------------------------------------------------------
+// Staffing from user-editable task hours
+// ---------------------------------------------------------------------------
+
+/**
+ * Build traditional staffing rows from a (possibly user-edited) TaskHoursState.
+ * Uses the same role allocation logic as defaultTraditionalStaffing but
+ * operates on pre-scaled, pre-risk-adjusted hours.
+ */
+export function staffingFromTaskHours(
+  taskHours: TaskHoursState,
+  riskMultipliers: RiskMultipliers,
+): StaffingRow[] {
+  const t = taskHours.traditional;
+  const rm = riskMultipliers;
+  return [
+    {
+      role: 'contractAttorney',
+      hours: t.initialReview + t.privilegeReview + t.privilegeLogDrafting,
+      rate: DEFAULT_ROLE_RATES.contractAttorney,
+    },
+    {
+      role: 'juniorAssociate',
+      hours: Math.ceil(
+        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.secondLevelKeyDocIdentification) * 0.5,
+      ),
+      rate: DEFAULT_ROLE_RATES.juniorAssociate,
+    },
+    {
+      role: 'seniorAssociate',
+      hours: Math.ceil(
+        (t.secondLevelReview + t.secondLevelPrivilegeReview + t.secondLevelPrivilegeLogDrafting + t.keyDocIdentification + t.secondLevelKeyDocIdentification) * 0.5,
+      ),
+      rate: DEFAULT_ROLE_RATES.seniorAssociate,
+    },
+    {
+      role: 'partner',
+      hours: Math.ceil(t.keyDocIdentification * 0.5 * rm.partnerInvolvement),
+      rate: DEFAULT_ROLE_RATES.partner,
+    },
+  ];
+}
+
+/**
+ * Build AI-workflow staffing rows from a (possibly user-edited) TaskHoursState.
+ * Uses the same role allocation logic as defaultAiStaffing but operates on
+ * pre-scaled, pre-risk-adjusted hours.
+ */
+export function aiStaffingFromTaskHours(
+  taskHours: TaskHoursState,
+  riskMultipliers: RiskMultipliers,
+): StaffingRow[] {
+  const a = taskHours.ai;
+  const rm = riskMultipliers;
+  const secondLevelTotal = a.secondLevelReview + a.secondLevelPrivilegeReview + a.secondLevelPrivilegeLogDrafting + a.secondLevelKeyDocIdentification;
+  return [
+    {
+      role: 'contractAttorney',
+      hours: 0,
+      rate: DEFAULT_ROLE_RATES.contractAttorney,
+    },
+    {
+      role: 'juniorAssociate',
+      hours: Math.ceil(secondLevelTotal * 0.5 * rm.aiEfficiencyReduction),
+      rate: DEFAULT_ROLE_RATES.juniorAssociate,
+    },
+    {
+      role: 'seniorAssociate',
+      hours: Math.ceil(secondLevelTotal * 0.5 * rm.aiEfficiencyReduction),
+      rate: DEFAULT_ROLE_RATES.seniorAssociate,
+    },
+    {
+      role: 'partner',
+      hours: Math.ceil(a.secondLevelKeyDocIdentification * 0.5 * rm.partnerInvolvement),
+      rate: DEFAULT_ROLE_RATES.partner,
+    },
+  ];
 }
 
 /**
@@ -228,6 +414,9 @@ export interface RateOverrides {
 
   // Per-line-item staffing drill-down
   staffing?: StaffingOverridesMap;
+
+  // Pre-computed / user-edited task hours
+  taskHours?: TaskHoursState;
 }
 
 // ---------------------------------------------------------------------------
@@ -318,6 +507,37 @@ function sanitizeStaffingRows(v: unknown): StaffingRow[] | undefined {
   return rows.length > 0 ? rows : undefined;
 }
 
+const TRADITIONAL_TASK_KEYS = Object.keys(TRADITIONAL_TASK_HOURS);
+const AI_TASK_KEYS = Object.keys(AI_TASK_HOURS);
+
+function sanitizeTaskHoursRecord(
+  obj: Record<string, unknown>,
+  validKeys: string[],
+): Record<string, number> | undefined {
+  const result: Record<string, number> = {};
+  for (const key of validKeys) {
+    const v = obj[key];
+    const n = sanitizeNumber(v);
+    if (n === undefined) return undefined; // all fields required
+    result[key] = n;
+  }
+  return result;
+}
+
+function sanitizeTaskHours(obj: Record<string, unknown>): TaskHoursState | undefined {
+  if (typeof obj.traditional !== 'object' || obj.traditional === null) return undefined;
+  if (typeof obj.ai !== 'object' || obj.ai === null) return undefined;
+
+  const trad = sanitizeTaskHoursRecord(obj.traditional as Record<string, unknown>, TRADITIONAL_TASK_KEYS);
+  const ai = sanitizeTaskHoursRecord(obj.ai as Record<string, unknown>, AI_TASK_KEYS);
+  if (!trad || !ai) return undefined;
+
+  return {
+    traditional: trad as typeof TRADITIONAL_TASK_HOURS,
+    ai: ai as typeof AI_TASK_HOURS,
+  };
+}
+
 /**
  * Validate and sanitize an untrusted object (e.g., from URL JSON) into
  * a safe RateOverrides. Strips unknown keys, rejects non-numeric values,
@@ -348,6 +568,10 @@ export function sanitizeOverrides(raw: unknown): RateOverrides {
         }
       }
       if (hasAny) result.staffing = staffing;
+    } else if (key === 'taskHours' && typeof value === 'object' && value !== null) {
+      const taskHoursObj = value as Record<string, unknown>;
+      const sanitized = sanitizeTaskHours(taskHoursObj);
+      if (sanitized) result.taskHours = sanitized;
     }
   }
 

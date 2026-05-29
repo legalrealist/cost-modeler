@@ -5,11 +5,7 @@ import path from 'path';
 export default defineConfig({
   base: './',
   build: {
-    outDir: '.',
-    emptyOutDir: false,
-    rollupOptions: {
-      input: 'dev.html',
-    },
+    outDir: 'dist',
   },
   plugins: [react()],
   resolve: {

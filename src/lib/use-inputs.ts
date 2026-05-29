@@ -5,17 +5,24 @@ import { gigabytesToDocs, docsToGigabytes } from '@/lib/calculator';
 import { DEFAULTS } from '@/lib/pricing-data';
 import {
   DEFAULT_BUDGET_STATE,
+  DEFAULT_ROLE_RATES,
   PRESET_ENABLED_ITEMS,
   applyPreset,
   isValidPreset,
   isValidLineItemId,
   sanitizeOverrides,
+  getDefaultTaskHours,
+  getRiskMultipliers,
   type BudgetState,
   type RateOverrides,
   type StaffingOverridesMap,
   type StaffingRow,
+  type TaskHoursState,
+  type StaffingRole,
   type WorkflowPreset,
   type LineItemId,
+  type RiskMatterType,
+  type RiskDefensibility,
 } from '@/lib/rate-overrides';
 
 export const DEFAULT_INPUTS: MatterInputs = {
@@ -222,9 +229,46 @@ export function useMatterInputs() {
     setBudgetState(DEFAULT_BUDGET_STATE);
   }, []);
 
+  // --- Task calculator state (role rates + task hours) ---
+  const [roleRates, setRoleRatesState] = useState<Record<StaffingRole, number>>({ ...DEFAULT_ROLE_RATES });
+  const [taskHoursOverride, setTaskHoursOverrideState] = useState<TaskHoursState | null>(null);
+
+  const riskMultipliers = getRiskMultipliers(
+    inputs.matterType as RiskMatterType,
+    inputs.defensibility as RiskDefensibility,
+  );
+
+  const defaultTaskHours = getDefaultTaskHours(inputs.documentCount, riskMultipliers);
+  const taskHours = taskHoursOverride ?? defaultTaskHours;
+
+  const setRoleRate = useCallback((role: StaffingRole, value: number) => {
+    setRoleRatesState((prev) => ({ ...prev, [role]: value }));
+  }, []);
+
+  const setTraditionalTaskHour = useCallback((key: string, value: number) => {
+    setTaskHoursOverrideState((prev) => {
+      const base = prev ?? defaultTaskHours;
+      return { ...base, traditional: { ...base.traditional, [key]: value } };
+    });
+  }, [defaultTaskHours]);
+
+  const setAiTaskHour = useCallback((key: string, value: number) => {
+    setTaskHoursOverrideState((prev) => {
+      const base = prev ?? defaultTaskHours;
+      return { ...base, ai: { ...base.ai, [key]: value } };
+    });
+  }, [defaultTaskHours]);
+
+  const resetTaskCalculator = useCallback(() => {
+    setRoleRatesState({ ...DEFAULT_ROLE_RATES });
+    setTaskHoursOverrideState(null);
+  }, []);
+
   const reset = useCallback(() => {
     setInputsState(DEFAULT_INPUTS);
     setBudgetState(DEFAULT_BUDGET_STATE);
+    setRoleRatesState({ ...DEFAULT_ROLE_RATES });
+    setTaskHoursOverrideState(null);
   }, []);
 
   return {
@@ -237,6 +281,14 @@ export function useMatterInputs() {
     toggleLineItem,
     setStaffingOverride,
     resetBudget,
+    // Task calculator
+    roleRates,
+    setRoleRate,
+    taskHours,
+    riskMultipliers,
+    setTraditionalTaskHour,
+    setAiTaskHour,
+    resetTaskCalculator,
     reset,
   };
 }

@@ -3,6 +3,7 @@ import { Scale, Share2, RotateCcw, Check, ChevronDown, ChevronRight } from 'luci
 import { calculate } from '@/lib/calculator';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
+import { TaskCalculator } from '@/components/TaskCalculator';
 import { ResultsTable } from '@/components/ResultsTable';
 import { BudgetWorksheet } from '@/components/BudgetWorksheet';
 import { EditorialSummary, RecallReference } from '@/components/EditorialSummary';
@@ -21,10 +22,17 @@ export function CostModelerPage() {
     toggleLineItem,
     setStaffingOverride,
     resetBudget,
+    roleRates,
+    setRoleRate,
+    taskHours,
+    riskMultipliers,
+    setTraditionalTaskHour,
+    setAiTaskHour,
     reset,
   } = useMatterInputs();
   const [copied, setCopied] = useState(false);
   const [showBenchmarks, setShowBenchmarks] = useState(false);
+  const [showBudgetWorksheet, setShowBudgetWorksheet] = useState(false);
 
   const output = useMemo(() => calculate(inputs, budget), [inputs, budget]);
 
@@ -63,12 +71,12 @@ export function CostModelerPage() {
             {/* Intro */}
             <div className="mb-8">
               <h1 className="text-2xl font-bold tracking-tight">
-                Document review budget worksheet
+                Document review cost calculator
               </h1>
               <p className="text-muted-foreground mt-2 max-w-3xl">
-                Build a line-item budget for your matter. Start with a workflow preset,
-                then click any rate to customize. Benchmark ranges from the Winter 2026
-                ComplexDiscovery/EDRM survey are shown as reference — hover for sources.
+                Compare traditional human review vs AI-enhanced workflows. Configure task hours,
+                staffing rates, and matter risk profile — click any number to edit. Defaults
+                scale with document count and risk level.
               </p>
             </div>
 
@@ -99,47 +107,48 @@ export function CostModelerPage() {
               </div>
 
               <div className="space-y-6 min-w-0">
-                {/* Primary: Budget Worksheet */}
-                <BudgetWorksheet
-                  output={output}
-                  budget={budget}
-                  onPresetChange={setPreset}
-                  onToggleItem={toggleLineItem}
-                  onOverride={setOverride}
-                  onStaffingOverride={setStaffingOverride}
-                  onResetBudget={resetBudget}
+                {/* Primary: Task Calculator */}
+                <TaskCalculator
+                  docCount={inputs.documentCount}
+                  traditionalTaskHours={taskHours.traditional}
+                  aiTaskHours={taskHours.ai}
+                  roleRates={roleRates}
+                  aiEfficiency={riskMultipliers.aiEfficiencyReduction}
+                  riskLabel={getRiskLabel(inputs.matterType, inputs.defensibility)}
+                  onTraditionalTaskChange={setTraditionalTaskHour}
+                  onAiTaskChange={setAiTaskHour}
+                  onRoleRateChange={setRoleRate}
                 />
 
-                {/* Demoted: Market benchmarks (collapsible) */}
-                <Card>
-                  <button
-                    type="button"
-                    onClick={() => setShowBenchmarks(!showBenchmarks)}
-                    className="w-full text-left"
-                    aria-expanded={showBenchmarks}
-                  >
-                    <CardHeader className="hover:bg-secondary/30 transition-colors rounded-t-lg">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {showBenchmarks ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                        Market comparison
-                        <span className="text-sm font-normal text-muted-foreground ml-2">
-                          Six delivery models at industry benchmark rates
-                        </span>
-                      </CardTitle>
-                    </CardHeader>
-                  </button>
-                  {showBenchmarks && (
-                    <CardContent className="space-y-6">
-                      <ResultsTable output={output} />
-                      <EditorialSummary output={output} />
-                      <RecallReference />
-                    </CardContent>
-                  )}
-                </Card>
+                {/* Vendor line-item budget (collapsible) */}
+                <CollapsibleSection
+                  title="Vendor line-item budget"
+                  subtitle="Line items organized by how invoices arrive"
+                  open={showBudgetWorksheet}
+                  onToggle={() => setShowBudgetWorksheet(!showBudgetWorksheet)}
+                >
+                  <BudgetWorksheet
+                    output={output}
+                    budget={budget}
+                    onPresetChange={setPreset}
+                    onToggleItem={toggleLineItem}
+                    onOverride={setOverride}
+                    onStaffingOverride={setStaffingOverride}
+                    onResetBudget={resetBudget}
+                  />
+                </CollapsibleSection>
+
+                {/* Market benchmarks (collapsible) */}
+                <CollapsibleSection
+                  title="Market comparison"
+                  subtitle="Six delivery models at industry benchmark rates"
+                  open={showBenchmarks}
+                  onToggle={() => setShowBenchmarks(!showBenchmarks)}
+                >
+                  <ResultsTable output={output} />
+                  <EditorialSummary output={output} />
+                  <RecallReference />
+                </CollapsibleSection>
 
                 <Disclaimer />
               </div>
@@ -148,6 +157,69 @@ export function CostModelerPage() {
         </main>
       </div>
     </TooltipProvider>
+  );
+}
+
+function getRiskLabel(matterType: string, defensibility: string): string {
+  const labels: Record<string, string> = {
+    'adversarial:high': 'Maximum oversight',
+    'adversarial:standard': 'High oversight',
+    'adversarial:low': 'Standard oversight',
+    'regulatory:high': 'High oversight',
+    'regulatory:standard': 'Moderate oversight',
+    'investigation:standard': 'Moderate oversight',
+    'investigation:low': 'Reduced oversight',
+    'post_production:high': 'Minimal oversight',
+    'post_production:standard': 'Minimal oversight',
+    'post_production:low': 'Minimal oversight',
+    'compliance:high': 'Minimal oversight',
+    'compliance:standard': 'Minimal oversight',
+    'compliance:low': 'Minimal oversight',
+  };
+  return labels[`${matterType}:${defensibility}`] ?? 'Standard oversight';
+}
+
+function CollapsibleSection({
+  title,
+  subtitle,
+  open,
+  onToggle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <button
+        type="button"
+        onClick={onToggle}
+        className="w-full text-left"
+        aria-expanded={open}
+      >
+        <CardHeader className="hover:bg-secondary/30 transition-colors rounded-t-lg">
+          <CardTitle className="text-lg flex items-center gap-2">
+            {open ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+            {title}
+            <span className="text-sm font-normal text-muted-foreground ml-2">
+              {subtitle}
+            </span>
+          </CardTitle>
+        </CardHeader>
+      </button>
+      {open && (
+        <CardContent className="space-y-6">
+          {children}
+        </CardContent>
+      )}
+    </Card>
   );
 }
 
