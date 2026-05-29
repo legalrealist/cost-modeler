@@ -3,6 +3,17 @@ import type { MatterInputs } from '@/lib/calculator';
 import type { CorpusMix } from '@/lib/pricing-data';
 import { gigabytesToDocs, docsToGigabytes } from '@/lib/calculator';
 import { DEFAULTS } from '@/lib/pricing-data';
+import {
+  DEFAULT_BUDGET_STATE,
+  PRESET_ENABLED_ITEMS,
+  applyPreset,
+  type BudgetState,
+  type RateOverrides,
+  type StaffingOverridesMap,
+  type StaffingRow,
+  type WorkflowPreset,
+  type LineItemId,
+} from '@/lib/rate-overrides';
 
 export const DEFAULT_INPUTS: MatterInputs = {
   documentCount: DEFAULTS.documentCount,
@@ -74,20 +85,80 @@ function writeParams(inputs: MatterInputs) {
   window.history.replaceState({}, '', newUrl);
 }
 
+// ---------------------------------------------------------------------------
+// Budget state URL serialization
+// ---------------------------------------------------------------------------
+
+function readBudgetParams(): BudgetState {
+  if (typeof window === 'undefined') return DEFAULT_BUDGET_STATE;
+  const params = new URLSearchParams(window.location.search);
+
+  const preset = (params.get('bp') as WorkflowPreset) || DEFAULT_BUDGET_STATE.preset;
+
+  // Enabled items: stored as comma-separated IDs, or fall back to preset defaults.
+  const enabledParam = params.get('be');
+  const enabledItems: Set<LineItemId> = enabledParam
+    ? new Set(enabledParam.split(',') as LineItemId[])
+    : new Set(PRESET_ENABLED_ITEMS[preset]);
+
+  // Rate overrides: stored as JSON in `ro` param.
+  let overrides: RateOverrides = {};
+  const roParam = params.get('ro');
+  if (roParam) {
+    try {
+      overrides = JSON.parse(decodeURIComponent(roParam));
+    } catch {
+      // Ignore malformed overrides.
+    }
+  }
+
+  return { preset, enabledItems, overrides };
+}
+
+function writeBudgetParams(budget: BudgetState, params: URLSearchParams) {
+  params.set('bp', budget.preset);
+
+  // Only write enabled items if they differ from the preset defaults.
+  const presetDefaults = PRESET_ENABLED_ITEMS[budget.preset];
+  const currentItems = [...budget.enabledItems].sort();
+  const defaultItems = [...presetDefaults].sort();
+  if (currentItems.join(',') !== defaultItems.join(',')) {
+    params.set('be', currentItems.join(','));
+  }
+
+  // Only write overrides if any exist.
+  const sparseOverrides: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(budget.overrides)) {
+    if (v !== undefined) sparseOverrides[k] = v;
+  }
+  if (Object.keys(sparseOverrides).length > 0) {
+    params.set('ro', encodeURIComponent(JSON.stringify(sparseOverrides)));
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Combined hook
+// ---------------------------------------------------------------------------
+
 export function useMatterInputs() {
   const [inputs, setInputsState] = useState<MatterInputs>(() => readParams());
+  const [budget, setBudgetState] = useState<BudgetState>(() => readBudgetParams());
 
-  // When inputs change, sync URL.
+  // When inputs or budget change, sync URL.
   useEffect(() => {
     writeParams(inputs);
-  }, [inputs]);
+    // Re-read the params we just wrote, then add budget params on top.
+    const params = new URLSearchParams(window.location.search);
+    writeBudgetParams(budget, params);
+    const newUrl = `${window.location.pathname}?${params.toString()}`;
+    window.history.replaceState({}, '', newUrl);
+  }, [inputs, budget]);
 
   const setInputs = useCallback((updater: Partial<MatterInputs> | ((prev: MatterInputs) => MatterInputs)) => {
     setInputsState((prev) => {
       const next = typeof updater === 'function' ? updater(prev) : { ...prev, ...updater };
 
       // Auto-sync gigabytes <-> documentCount based on corpusMix.
-      // If documentCount or corpusMix changed, recompute gigabytes from doc count.
       if (next.documentCount !== prev.documentCount || next.corpusMix !== prev.corpusMix) {
         next.gigabytes = docsToGigabytes(next.documentCount, next.corpusMix);
       }
@@ -96,7 +167,6 @@ export function useMatterInputs() {
     });
   }, []);
 
-  // Also expose a setter that lets the user update GB directly.
   const setGigabytes = useCallback((gb: number) => {
     setInputsState((prev) => ({
       ...prev,
@@ -105,12 +175,69 @@ export function useMatterInputs() {
     }));
   }, []);
 
-  const reset = useCallback(() => setInputsState(DEFAULT_INPUTS), []);
+  const setPreset = useCallback((preset: WorkflowPreset) => {
+    setBudgetState((prev) => applyPreset(prev, preset));
+  }, []);
 
-  return { inputs, setInputs, setGigabytes, reset };
+  const setOverride = useCallback((key: keyof RateOverrides, value: number | undefined) => {
+    setBudgetState((prev) => ({
+      ...prev,
+      overrides: { ...prev.overrides, [key]: value },
+    }));
+  }, []);
+
+  const toggleLineItem = useCallback((id: LineItemId) => {
+    setBudgetState((prev) => {
+      const next = new Set(prev.enabledItems);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return { ...prev, enabledItems: next };
+    });
+  }, []);
+
+  const setStaffingOverride = useCallback(
+    (lineItemKey: keyof StaffingOverridesMap, rows: StaffingRow[] | undefined) => {
+      setBudgetState((prev) => ({
+        ...prev,
+        overrides: {
+          ...prev.overrides,
+          staffing: {
+            ...prev.overrides.staffing,
+            [lineItemKey]: rows,
+          },
+        },
+      }));
+    },
+    [],
+  );
+
+  const resetBudget = useCallback(() => {
+    setBudgetState(DEFAULT_BUDGET_STATE);
+  }, []);
+
+  const reset = useCallback(() => {
+    setInputsState(DEFAULT_INPUTS);
+    setBudgetState(DEFAULT_BUDGET_STATE);
+  }, []);
+
+  return {
+    inputs,
+    setInputs,
+    setGigabytes,
+    budget,
+    setPreset,
+    setOverride,
+    toggleLineItem,
+    setStaffingOverride,
+    resetBudget,
+    reset,
+  };
 }
 
-export function buildShareUrl(inputs: MatterInputs): string {
+export function buildShareUrl(inputs: MatterInputs, budget?: BudgetState): string {
   if (typeof window === 'undefined') return '';
   const params = new URLSearchParams();
   params.set(PARAM_KEYS.documentCount, String(Math.round(inputs.documentCount)));
@@ -121,5 +248,8 @@ export function buildShareUrl(inputs: MatterInputs): string {
   params.set(PARAM_KEYS.privilegeFraction, inputs.privilegeFraction.toFixed(2));
   params.set(PARAM_KEYS.defensibility, inputs.defensibility);
   params.set(PARAM_KEYS.hostingMonths, String(inputs.hostingMonths));
+  if (budget) {
+    writeBudgetParams(budget, params);
+  }
   return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
 }

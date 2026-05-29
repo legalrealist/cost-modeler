@@ -18,6 +18,17 @@ import {
   type CorpusMix,
   type PricedRange,
 } from './pricing-data';
+import {
+  resolveRate,
+  defaultTraditionalStaffing,
+  defaultAiStaffing,
+  defaultPmStaffing,
+  staffingTotal,
+  type RateOverrides,
+  type BudgetState,
+  type LineItemId,
+  type StaffingRow,
+} from './rate-overrides';
 
 // ---------------------------------------------------------------------------
 // Input shape
@@ -106,6 +117,18 @@ export interface LineItem {
   cost: CostRange;
   /** ID of the underlying rate or source. */
   sourceId: string;
+  /** Which line item ID this belongs to (for toggle/override mapping). */
+  lineItemId?: LineItemId;
+  /** Which RateOverrides key controls the rate for this item. */
+  rateKey?: keyof RateOverrides;
+  /** What the benchmark cost would be (without overrides). */
+  benchmarkCost?: CostRange;
+  /** True when the user has customized this rate. */
+  isOverridden?: boolean;
+  /** The unit for the editable rate (e.g., '$/doc', '$/GB/mo'). */
+  rateUnit?: string;
+  /** The multiplier quantity (e.g., doc count, GB × months). */
+  quantity?: number;
 }
 
 export interface LayeredBreakdown {
@@ -121,12 +144,34 @@ export interface LayeredBreakdown {
   };
 }
 
+/** Budget worksheet: a unified list of all possible line items with overrides applied. */
+export interface BudgetWorksheetOutput {
+  items: BudgetLineItem[];
+  /** Total of enabled items only. */
+  total: CostRange;
+}
+
+export interface BudgetLineItem extends LineItem {
+  lineItemId: LineItemId;
+  enabled: boolean;
+  /** Whether this line item supports staffing drill-down. */
+  hasStaffing?: boolean;
+  /** Default staffing rows (generated from doc count / assumptions). */
+  defaultStaffing?: StaffingRow[];
+  /** User-overridden staffing rows (if any). */
+  staffingOverride?: StaffingRow[];
+  /** Whether the user has expanded staffing and is using staffing-derived cost. */
+  useStaffingCost?: boolean;
+}
+
 export interface CalculatorOutput {
   inputs: MatterInputs;
   /** All six delivery models with cost, time, and flags. */
   deliveryModels: DeliveryModel[];
   /** Side-by-side modern vs. traditional breakdown. */
   layered: LayeredBreakdown;
+  /** Budget worksheet: unified line items with overrides + toggles applied. */
+  budget: BudgetWorksheetOutput;
   /**
    * Editorial summary line — opinionated.
    * Null on degenerate inputs (zero documents, sub-$5K matters, only one
@@ -525,8 +570,10 @@ function sanitize(inputs: MatterInputs): MatterInputs {
   };
 }
 
-export function calculate(rawInputs: MatterInputs): CalculatorOutput {
+export function calculate(rawInputs: MatterInputs, budgetState?: BudgetState): CalculatorOutput {
   const inputs = sanitize(rawInputs);
+  const overrides = budgetState?.overrides ?? {};
+  const enabledItems = budgetState?.enabledItems;
 
   // Per-model time assessments
   const tRawApi = timeRawApi(inputs);
@@ -716,10 +763,14 @@ export function calculate(rawInputs: MatterInputs): CalculatorOutput {
     sorted.length < 2 ||
     midpoint(sorted[0].cost) < 5_000;
 
+  // ---- Budget worksheet — unified line items with overrides ----
+  const budget = buildBudgetWorksheet(inputs, overrides, enabledItems);
+
   return {
     inputs,
     deliveryModels,
     layered,
+    budget,
     summary: isDegenerate
       ? null
       : {
@@ -730,6 +781,197 @@ export function calculate(rawInputs: MatterInputs): CalculatorOutput {
           spreadMultiplier: midpoint(sorted[sorted.length - 1].cost) / midpoint(sorted[0].cost),
         },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Budget worksheet builder
+// ---------------------------------------------------------------------------
+
+function buildBudgetLineItem(
+  lineItemId: LineItemId,
+  label: string,
+  benchmarkRate: PricedRange,
+  overrideValue: number | undefined,
+  quantity: number,
+  rateKey: keyof RateOverrides,
+  sourceId: string,
+  enabled: boolean,
+): BudgetLineItem {
+  const rate = resolveRate(benchmarkRate, overrideValue);
+  const cost = multiplyRange(rate, quantity);
+  const benchmarkCost = multiplyRange(benchmarkRate, quantity);
+  const isOverridden = overrideValue !== undefined;
+  return {
+    lineItemId,
+    label,
+    formula: `${formatRange(rate, benchmarkRate.unit)} × ${formatNumber(quantity)} ${benchmarkRate.unit.replace(/^\$\//, '')}`,
+    cost,
+    sourceId,
+    rateKey,
+    benchmarkCost: isOverridden ? benchmarkCost : undefined,
+    isOverridden,
+    rateUnit: benchmarkRate.unit,
+    quantity,
+    enabled,
+  };
+}
+
+function buildBudgetWorksheet(
+  inputs: MatterInputs,
+  overrides: RateOverrides,
+  enabledItems?: Set<LineItemId>,
+): BudgetWorksheetOutput {
+  const isOn = (id: LineItemId) => enabledItems ? enabledItems.has(id) : true;
+  const tarCull = overrides.tarCullFraction ?? 0.6;
+  const privQcFraction = overrides.privilegeQcFraction ?? 0.05;
+  const pmMultiplier = overrides.pmScalingMultiplier ?? 1.0;
+  const pmHours = Math.ceil(scaledPmHours(inputs.documentCount) * pmMultiplier);
+
+  const items: BudgetLineItem[] = [];
+
+  // Hosting
+  const hostingQty = inputs.gigabytes * inputs.hostingMonths;
+  items.push(buildBudgetLineItem(
+    'hosting',
+    `Hosting (${inputs.hostingMonths} mo × ${formatGB(inputs.gigabytes)})`,
+    PER_GB_RATES.hostingMidTier,
+    overrides.hosting,
+    hostingQty,
+    'hosting',
+    'DECOVER_AI_2026',
+    isOn('hosting'),
+  ));
+
+  // Processing
+  items.push(buildBudgetLineItem(
+    'processing',
+    `Processing (${formatGB(inputs.gigabytes)})`,
+    PER_GB_RATES.processingLegacy,
+    overrides.processingLegacy,
+    inputs.gigabytes,
+    'processingLegacy',
+    'DISCOVER_LEX_2026',
+    isOn('processing'),
+  ));
+
+  // AI review
+  items.push(buildBudgetLineItem(
+    'aiReview',
+    `AI review (${formatNumber(inputs.documentCount)} docs)`,
+    PER_DOC_RATES.genaiAssistedReview,
+    overrides.genaiAssistedReview,
+    inputs.documentCount,
+    'genaiAssistedReview',
+    'WINTER_2026_SURVEY',
+    isOn('aiReview'),
+  ));
+
+  // Human responsiveness review (quantity depends on TAR cull assumption)
+  const humanReviewDocs = inputs.documentCount * (1 - tarCull);
+  const isAiWorkflow = isOn('aiReview') && !isOn('humanReview');
+  const humanReviewDefaultStaffing = isAiWorkflow
+    ? defaultAiStaffing(inputs.documentCount)
+    : defaultTraditionalStaffing(humanReviewDocs);
+  const humanReviewStaffingOverride = overrides.staffing?.humanReview;
+  const humanReviewUseStaffing = !!humanReviewStaffingOverride;
+  const humanReviewItem = buildBudgetLineItem(
+    'humanReview',
+    `Human responsiveness review (${formatNumber(humanReviewDocs)} docs after ${(tarCull * 100).toFixed(0)}% TAR cull)`,
+    PER_DOC_RATES.humanResponsivenessFirstPass,
+    humanReviewUseStaffing ? undefined : overrides.humanResponsivenessFirstPass,
+    humanReviewDocs,
+    'humanResponsivenessFirstPass',
+    'WINTER_2026_SURVEY',
+    isOn('humanReview'),
+  );
+  humanReviewItem.hasStaffing = true;
+  humanReviewItem.defaultStaffing = humanReviewDefaultStaffing;
+  humanReviewItem.staffingOverride = humanReviewStaffingOverride;
+  humanReviewItem.useStaffingCost = humanReviewUseStaffing;
+  if (humanReviewUseStaffing) {
+    const total = staffingTotal(humanReviewStaffingOverride);
+    humanReviewItem.cost = { low: total, high: total };
+    humanReviewItem.isOverridden = true;
+  }
+  items.push(humanReviewItem);
+
+  // Human privilege review — quantity depends on preset context
+  const privDocs = inputs.privilegeRequired
+    ? (isOn('aiReview') && !isOn('humanReview'))
+      ? inputs.documentCount * inputs.privilegeFraction * privQcFraction
+      : inputs.documentCount * inputs.privilegeFraction
+    : 0;
+  const privStaffingOverride = overrides.staffing?.humanPrivilege;
+  const privUseStaffing = !!privStaffingOverride;
+  const privItem = buildBudgetLineItem(
+    'humanPrivilege',
+    inputs.privilegeRequired
+      ? (isOn('aiReview') && !isOn('humanReview'))
+        ? `Privilege QC (${(privQcFraction * 100).toFixed(0)}% of privileged, ${formatNumber(privDocs)} docs)`
+        : `Human privilege review (${formatNumber(privDocs)} docs)`
+      : 'Human privilege review (not required)',
+    PER_DOC_RATES.humanPrivilegeReview,
+    privUseStaffing ? undefined : overrides.humanPrivilegeReview,
+    privDocs,
+    'humanPrivilegeReview',
+    'DECOVER_AI_2026',
+    isOn('humanPrivilege') && inputs.privilegeRequired,
+  );
+  privItem.hasStaffing = true;
+  privItem.defaultStaffing = defaultTraditionalStaffing(privDocs);
+  privItem.staffingOverride = privStaffingOverride;
+  privItem.useStaffingCost = privUseStaffing;
+  if (privUseStaffing) {
+    const total = staffingTotal(privStaffingOverride);
+    privItem.cost = { low: total, high: total };
+    privItem.isOverridden = true;
+  }
+  items.push(privItem);
+
+  // Production
+  const tradProductionRate = productionRate(inputs.matterType);
+  const producedPages = inputs.documentCount * tradProductionRate * DEFAULTS.pagesPerDoc;
+  items.push(buildBudgetLineItem(
+    'production',
+    tradProductionRate > 0
+      ? `Production (${formatNumber(producedPages)} pages, ${(tradProductionRate * 100).toFixed(0)}% Bates-stamped)`
+      : 'Production (none for this matter type)',
+    OTHER_RATES.productionPerPage,
+    overrides.productionPerPage,
+    producedPages,
+    'productionPerPage',
+    'DECOVER_AI_2026',
+    isOn('production') && tradProductionRate > 0,
+  ));
+
+  // Project management
+  const pmStaffingOverride = overrides.staffing?.projectManagement;
+  const pmUseStaffing = !!pmStaffingOverride;
+  const pmItem = buildBudgetLineItem(
+    'projectManagement',
+    `Project management (${pmHours} hrs)`,
+    OTHER_RATES.projectManagementPerHour,
+    pmUseStaffing ? undefined : overrides.projectManagementPerHour,
+    pmHours,
+    'projectManagementPerHour',
+    'WINTER_2026_SURVEY',
+    isOn('projectManagement'),
+  );
+  pmItem.hasStaffing = true;
+  pmItem.defaultStaffing = defaultPmStaffing(pmHours);
+  pmItem.staffingOverride = pmStaffingOverride;
+  pmItem.useStaffingCost = pmUseStaffing;
+  if (pmUseStaffing) {
+    const total = staffingTotal(pmStaffingOverride);
+    pmItem.cost = { low: total, high: total };
+    pmItem.isOverridden = true;
+  }
+  items.push(pmItem);
+
+  const enabledCosts = items.filter((i) => i.enabled).map((i) => i.cost);
+  const total = enabledCosts.length > 0 ? addRanges(...enabledCosts) : { low: 0, high: 0 };
+
+  return { items, total };
 }
 
 // ---------------------------------------------------------------------------

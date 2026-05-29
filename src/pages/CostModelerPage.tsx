@@ -1,22 +1,35 @@
 import { useMemo, useState } from 'react';
-import { Scale, Share2, RotateCcw, Check } from 'lucide-react';
+import { Scale, Share2, RotateCcw, Check, ChevronDown, ChevronRight } from 'lucide-react';
 import { calculate } from '@/lib/calculator';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
 import { ResultsTable } from '@/components/ResultsTable';
-import { LayeredBreakdown } from '@/components/LayeredBreakdown';
+import { BudgetWorksheet } from '@/components/BudgetWorksheet';
 import { EditorialSummary, RecallReference } from '@/components/EditorialSummary';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
 export function CostModelerPage() {
-  const { inputs, setInputs, setGigabytes, reset } = useMatterInputs();
+  const {
+    inputs,
+    setInputs,
+    setGigabytes,
+    budget,
+    setPreset,
+    setOverride,
+    toggleLineItem,
+    setStaffingOverride,
+    resetBudget,
+    reset,
+  } = useMatterInputs();
   const [copied, setCopied] = useState(false);
+  const [showBenchmarks, setShowBenchmarks] = useState(false);
 
-  const output = useMemo(() => calculate(inputs), [inputs]);
+  const output = useMemo(() => calculate(inputs, budget), [inputs, budget]);
 
   const handleShare = async () => {
-    const url = buildShareUrl(inputs);
+    const url = buildShareUrl(inputs, budget);
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
@@ -40,7 +53,7 @@ export function CostModelerPage() {
               href="https://legalhack.io"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
-              ← LegalHack
+              &larr; LegalHack
             </a>
           </div>
         </header>
@@ -50,12 +63,12 @@ export function CostModelerPage() {
             {/* Intro */}
             <div className="mb-8">
               <h1 className="text-2xl font-bold tracking-tight">
-                Cost & time estimate for a document review matter
+                Document review budget worksheet
               </h1>
               <p className="text-muted-foreground mt-2 max-w-3xl">
-                Five inputs. Six delivery models. Numbers drawn from the Winter 2026
-                ComplexDiscovery/EDRM pricing survey, the DecoverAI 2026 benchmark, and the
-                LegalHack Legal AI Landscape series. Hover any number for its source.
+                Build a line-item budget for your matter. Start with a workflow preset,
+                then click any rate to customize. Benchmark ranges from the Winter 2026
+                ComplexDiscovery/EDRM survey are shown as reference — hover for sources.
               </p>
             </div>
 
@@ -86,10 +99,48 @@ export function CostModelerPage() {
               </div>
 
               <div className="space-y-6 min-w-0">
-                <ResultsTable output={output} />
-                <EditorialSummary output={output} />
-                <LayeredBreakdown output={output} />
-                <RecallReference />
+                {/* Primary: Budget Worksheet */}
+                <BudgetWorksheet
+                  output={output}
+                  budget={budget}
+                  onPresetChange={setPreset}
+                  onToggleItem={toggleLineItem}
+                  onOverride={setOverride}
+                  onStaffingOverride={setStaffingOverride}
+                  onResetBudget={resetBudget}
+                />
+
+                {/* Demoted: Market benchmarks (collapsible) */}
+                <Card>
+                  <button
+                    type="button"
+                    onClick={() => setShowBenchmarks(!showBenchmarks)}
+                    className="w-full text-left"
+                    aria-expanded={showBenchmarks}
+                  >
+                    <CardHeader className="hover:bg-secondary/30 transition-colors rounded-t-lg">
+                      <CardTitle className="text-lg flex items-center gap-2">
+                        {showBenchmarks ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                        Market comparison
+                        <span className="text-sm font-normal text-muted-foreground ml-2">
+                          Six delivery models at industry benchmark rates
+                        </span>
+                      </CardTitle>
+                    </CardHeader>
+                  </button>
+                  {showBenchmarks && (
+                    <CardContent className="space-y-6">
+                      <ResultsTable output={output} />
+                      <EditorialSummary output={output} />
+                      <RecallReference />
+                    </CardContent>
+                  )}
+                </Card>
+
                 <Disclaimer />
               </div>
             </div>
