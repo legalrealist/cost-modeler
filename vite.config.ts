@@ -4,6 +4,10 @@ import path from 'path';
 
 export default defineConfig({
   base: '/cost-modeler/',
+  build: {
+    outDir: '.',
+    emptyOutDir: false,
+  },
   plugins: [react()],
   resolve: {
     alias: {
