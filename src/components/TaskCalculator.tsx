@@ -697,7 +697,128 @@ export function TaskCalculator({
             </Badge>
           </div>
         )}
+
+        {/* Key takeaways */}
+        <KeyTakeaways
+          traditionalCost={traditionalBreakdown.totalCost}
+          aiCost={aiBreakdown.totalCost}
+          traditionalHours={traditionalTotalHours}
+          aiHumanHours={aiTotalHumanHours}
+          savings={savings}
+          savingsPct={savingsPct}
+          aiProcessingCost={aiBreakdown.aiProcessingCost}
+          traditionalBreakdown={traditionalBreakdown}
+          aiBreakdown={aiBreakdown}
+          riskLabel={riskLabel}
+        />
       </div>
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Key Takeaways
+// ---------------------------------------------------------------------------
+
+function KeyTakeaways({
+  traditionalCost,
+  aiCost,
+  traditionalHours,
+  aiHumanHours,
+  savings,
+  savingsPct,
+  aiProcessingCost,
+  traditionalBreakdown,
+  aiBreakdown,
+  riskLabel,
+}: {
+  traditionalCost: number;
+  aiCost: number;
+  traditionalHours: number;
+  aiHumanHours: number;
+  savings: number;
+  savingsPct: number;
+  aiProcessingCost: number;
+  traditionalBreakdown: CostBreakdown;
+  aiBreakdown: CostBreakdown;
+  riskLabel?: string;
+}) {
+  const hoursSaved = traditionalHours - aiHumanHours;
+  const hoursPct = traditionalHours > 0 ? (hoursSaved / traditionalHours) * 100 : 0;
+
+  const biggestTraditionalRole = (Object.entries(traditionalBreakdown.roleCosts) as [StaffingRole, number][])
+    .filter(([, c]) => c > 0)
+    .sort(([, a], [, b]) => b - a)[0];
+
+  const aiProcessingPct = aiCost > 0 ? (aiProcessingCost / aiCost) * 100 : 0;
+
+  const insights: string[] = [];
+
+  if (savings > 0) {
+    insights.push(
+      `AI-enhanced workflow saves ${fmt(savings)} (${savingsPct.toFixed(0)}%) compared to traditional review.`
+    );
+  } else if (savings < 0) {
+    insights.push(
+      `Traditional workflow is ${fmt(Math.abs(savings))} cheaper — AI overhead exceeds efficiency gains at this configuration.`
+    );
+  }
+
+  if (hoursSaved > 0) {
+    insights.push(
+      `Human hours drop from ${traditionalHours.toLocaleString()} to ${aiHumanHours.toLocaleString()} — ${hoursPct.toFixed(0)}% reduction (${hoursSaved.toLocaleString()} fewer hours).`
+    );
+  }
+
+  if (biggestTraditionalRole) {
+    const [role, cost] = biggestTraditionalRole;
+    const pct = (cost / traditionalCost) * 100;
+    insights.push(
+      `${STAFFING_ROLE_LABELS[role]} costs drive ${pct.toFixed(0)}% of the traditional budget (${fmt(cost)}).`
+    );
+  }
+
+  if (aiProcessingCost > 0) {
+    insights.push(
+      `AI processing adds only ${fmt(aiProcessingCost)} (${aiProcessingPct.toFixed(1)}% of AI-enhanced total) — the real cost is still human QC.`
+    );
+  }
+
+  if (traditionalBreakdown.roleCosts.contractAttorney > 0 && aiBreakdown.roleCosts.contractAttorney === 0) {
+    insights.push(
+      `AI eliminates all contract attorney hours (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved) by automating first-pass review.`
+    );
+  }
+
+  if (riskLabel) {
+    insights.push(
+      `Risk profile: ${riskLabel}. Task hours are scaled to reflect the oversight level required for this matter type.`
+    );
+  }
+
+  if (insights.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm">Key takeaways</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ul className="space-y-2">
+          {insights.map((insight, i) => (
+            <li key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+              <span className="text-primary mt-0.5 shrink-0">•</span>
+              <span>{insight}</span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString('en-US')}K`;
+  return `$${Math.round(n).toLocaleString('en-US')}`;
 }
