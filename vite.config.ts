@@ -6,6 +6,12 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist',
+    rollupOptions: {
+      input: path.resolve(__dirname, 'index.dev.html'),
+    },
+  },
+  server: {
+    open: '/index.dev.html',
   },
   plugins: [react()],
   resolve: {

@@ -3,10 +3,9 @@ import { Scale, Share2, RotateCcw, Check, ChevronDown, ChevronRight } from 'luci
 import { calculate } from '@/lib/calculator';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
-import { TaskCalculator } from '@/components/TaskCalculator';
-import { ResultsTable } from '@/components/ResultsTable';
+import { TaskCalculator, computeTraditionalCosts, computeAiCosts } from '@/components/TaskCalculator';
+import { CostPositioning } from '@/components/CostPositioning';
 import { BudgetWorksheet } from '@/components/BudgetWorksheet';
-import { EditorialSummary, RecallReference } from '@/components/EditorialSummary';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -31,10 +30,17 @@ export function CostModelerPage() {
     reset,
   } = useMatterInputs();
   const [copied, setCopied] = useState(false);
-  const [showBenchmarks, setShowBenchmarks] = useState(false);
   const [showBudgetWorksheet, setShowBudgetWorksheet] = useState(false);
 
   const output = useMemo(() => calculate(inputs, budget), [inputs, budget]);
+  const userTraditionalCost = useMemo(
+    () => computeTraditionalCosts(taskHours.traditional, roleRates).totalCost,
+    [taskHours.traditional, roleRates],
+  );
+  const userAiCost = useMemo(
+    () => computeAiCosts(taskHours.ai, roleRates, riskMultipliers.aiEfficiencyReduction, inputs.documentCount).totalCost,
+    [taskHours.ai, roleRates, riskMultipliers.aiEfficiencyReduction, inputs.documentCount],
+  );
 
   const handleShare = async () => {
     const url = buildShareUrl(inputs, budget);
@@ -138,17 +144,12 @@ export function CostModelerPage() {
                   />
                 </CollapsibleSection>
 
-                {/* Market benchmarks (collapsible) */}
-                <CollapsibleSection
-                  title="Market comparison"
-                  subtitle="Six delivery models at industry benchmark rates"
-                  open={showBenchmarks}
-                  onToggle={() => setShowBenchmarks(!showBenchmarks)}
-                >
-                  <ResultsTable output={output} />
-                  <EditorialSummary output={output} />
-                  <RecallReference />
-                </CollapsibleSection>
+                {/* Market positioning */}
+                <CostPositioning
+                  output={output}
+                  userTraditionalCost={userTraditionalCost}
+                  userAiCost={userAiCost}
+                />
 
                 <Disclaimer />
               </div>

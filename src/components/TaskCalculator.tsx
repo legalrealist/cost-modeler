@@ -69,7 +69,7 @@ interface RoleHours {
   partner: number;
 }
 
-interface CostBreakdown {
+export interface CostBreakdown {
   roleCosts: Record<StaffingRole, number>;
   roleHours: RoleHours;
   aiProcessingCost: number;
@@ -77,7 +77,7 @@ interface CostBreakdown {
   totalCost: number;
 }
 
-function computeTraditionalCosts(
+export function computeTraditionalCosts(
   t: TraditionalTaskHours,
   rates: Record<StaffingRole, number>,
 ): CostBreakdown {
@@ -113,7 +113,7 @@ function computeTraditionalCosts(
   return { roleCosts, roleHours, aiProcessingCost: 0, totalHours, totalCost };
 }
 
-function computeAiCosts(
+export function computeAiCosts(
   a: AiTaskHours,
   rates: Record<StaffingRole, number>,
   aiEfficiency: number,
