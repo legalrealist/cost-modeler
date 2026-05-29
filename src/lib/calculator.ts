@@ -982,7 +982,7 @@ function buildBudgetWorksheet(
   const enabledCosts = items.filter((i) => i.enabled).map((i) => i.cost);
   const total = enabledCosts.length > 0 ? addRanges(...enabledCosts) : { low: 0, high: 0 };
 
-  const warnings = generateBudgetWarnings(inputs, items, enabledItems);
+  const warnings = generateBudgetWarnings(inputs, items);
 
   return { items, total, warnings };
 }
@@ -994,12 +994,10 @@ function buildBudgetWorksheet(
 function generateBudgetWarnings(
   inputs: MatterInputs,
   items: BudgetLineItem[],
-  enabledItems?: Set<LineItemId>,
 ): BudgetWarning[] {
   const warnings: BudgetWarning[] = [];
   const on = (id: LineItemId) => items.find((i) => i.lineItemId === id)?.enabled ?? false;
 
-  // Privilege review disabled on a matter that requires it
   if (inputs.privilegeRequired && !on('humanPrivilege')) {
     warnings.push({
       level: 'warning',
@@ -1008,7 +1006,6 @@ function generateBudgetWarnings(
     });
   }
 
-  // Adversarial matter with no human QC layer at all
   if (inputs.matterType === 'adversarial' && on('aiReview') && !on('humanReview')) {
     if (inputs.defensibility === 'high') {
       warnings.push({
@@ -1018,9 +1015,8 @@ function generateBudgetWarnings(
     }
   }
 
-  // Human review enabled — check timeline feasibility
   if (on('humanReview')) {
-    const time = enabledItems?.has('aiReview')
+    const time = on('aiReview')
       ? timeTraditionalTar(inputs)
       : timeHumanReview(inputs);
     if (!time.feasible) {
@@ -1032,7 +1028,6 @@ function generateBudgetWarnings(
     }
   }
 
-  // AI review without hosting
   if (on('aiReview') && !on('hosting')) {
     warnings.push({
       level: 'info',
@@ -1041,7 +1036,6 @@ function generateBudgetWarnings(
     });
   }
 
-  // No project management on large matters
   if (!on('projectManagement') && inputs.documentCount > 50_000) {
     warnings.push({
       level: 'caution',
@@ -1050,7 +1044,6 @@ function generateBudgetWarnings(
     });
   }
 
-  // Post-production / investigation with heavy human review
   if (inputs.matterType === 'post_production' && on('humanReview') && !on('aiReview')) {
     warnings.push({
       level: 'info',

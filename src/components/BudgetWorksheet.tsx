@@ -157,8 +157,8 @@ export function BudgetWorksheet({
 
         {warnings.length > 0 && (
           <div className="mt-3 space-y-1.5">
-            {warnings.map((w, i) => (
-              <WarningBanner key={i} warning={w} />
+            {warnings.map((w) => (
+              <WarningBanner key={`${w.level}-${w.lineItemId ?? 'general'}`} warning={w} />
             ))}
           </div>
         )}

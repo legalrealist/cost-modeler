@@ -7,6 +7,9 @@ import {
   DEFAULT_BUDGET_STATE,
   PRESET_ENABLED_ITEMS,
   applyPreset,
+  isValidPreset,
+  isValidLineItemId,
+  sanitizeOverrides,
   type BudgetState,
   type RateOverrides,
   type StaffingOverridesMap,
@@ -93,22 +96,23 @@ function readBudgetParams(): BudgetState {
   if (typeof window === 'undefined') return DEFAULT_BUDGET_STATE;
   const params = new URLSearchParams(window.location.search);
 
-  const preset = (params.get('bp') as WorkflowPreset) || DEFAULT_BUDGET_STATE.preset;
+  const rawPreset = params.get('bp');
+  const preset: WorkflowPreset = isValidPreset(rawPreset) ? rawPreset : DEFAULT_BUDGET_STATE.preset;
 
-  // Enabled items: stored as comma-separated IDs, or fall back to preset defaults.
+  // Enabled items: stored as comma-separated IDs, filtered to valid IDs only.
   const enabledParam = params.get('be');
   const enabledItems: Set<LineItemId> = enabledParam
-    ? new Set(enabledParam.split(',') as LineItemId[])
+    ? new Set(enabledParam.split(',').filter(isValidLineItemId))
     : new Set(PRESET_ENABLED_ITEMS[preset]);
 
-  // Rate overrides: stored as JSON in `ro` param.
+  // Rate overrides: parsed from JSON, then sanitized to strip invalid keys/values.
   let overrides: RateOverrides = {};
   const roParam = params.get('ro');
   if (roParam) {
     try {
-      overrides = JSON.parse(decodeURIComponent(roParam));
+      overrides = sanitizeOverrides(JSON.parse(decodeURIComponent(roParam)));
     } catch {
-      // Ignore malformed overrides.
+      // Ignore malformed JSON.
     }
   }
 

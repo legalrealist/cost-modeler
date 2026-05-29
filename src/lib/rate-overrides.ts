@@ -276,6 +276,84 @@ export function hasOverrides(overrides: RateOverrides): boolean {
   );
 }
 
+const VALID_PRESETS = new Set<WorkflowPreset>(['modern', 'traditional']);
+
+export function isValidPreset(v: unknown): v is WorkflowPreset {
+  return typeof v === 'string' && VALID_PRESETS.has(v as WorkflowPreset);
+}
+
+const LINE_ITEM_ID_SET = new Set<string>(LINE_ITEM_IDS);
+
+export function isValidLineItemId(v: unknown): v is LineItemId {
+  return typeof v === 'string' && LINE_ITEM_ID_SET.has(v);
+}
+
+const NUMERIC_OVERRIDE_KEYS: ReadonlySet<string> = new Set([
+  'genaiAssistedReview', 'humanResponsivenessFirstPass', 'humanPrivilegeReview',
+  'hosting', 'processingLegacy', 'projectManagementPerHour', 'productionPerPage',
+  'tarCullFraction', 'privilegeQcFraction', 'pmScalingMultiplier',
+]);
+
+const STAFFING_OVERRIDE_KEYS: ReadonlySet<string> = new Set([
+  'humanReview', 'humanPrivilege', 'projectManagement',
+]);
+
+function sanitizeNumber(v: unknown): number | undefined {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) return undefined;
+  return v;
+}
+
+function sanitizeStaffingRows(v: unknown): StaffingRow[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const rows: StaffingRow[] = [];
+  for (const item of v) {
+    if (typeof item !== 'object' || item === null) return undefined;
+    const { role, hours, rate } = item as Record<string, unknown>;
+    if (!STAFFING_ROLES.includes(role as StaffingRole)) return undefined;
+    const h = sanitizeNumber(hours);
+    const r = sanitizeNumber(rate);
+    if (h === undefined || r === undefined) return undefined;
+    rows.push({ role: role as StaffingRole, hours: h, rate: r });
+  }
+  return rows.length > 0 ? rows : undefined;
+}
+
+/**
+ * Validate and sanitize an untrusted object (e.g., from URL JSON) into
+ * a safe RateOverrides. Strips unknown keys, rejects non-numeric values,
+ * rejects negative numbers, and validates staffing row structure.
+ */
+export function sanitizeOverrides(raw: unknown): RateOverrides {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  const result: RateOverrides = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (NUMERIC_OVERRIDE_KEYS.has(key)) {
+      const n = sanitizeNumber(value);
+      if (n !== undefined) {
+        (result as Record<string, number>)[key] = n;
+      }
+    } else if (key === 'staffing' && typeof value === 'object' && value !== null) {
+      const staffingObj = value as Record<string, unknown>;
+      const staffing: StaffingOverridesMap = {};
+      let hasAny = false;
+      for (const [sk, sv] of Object.entries(staffingObj)) {
+        if (STAFFING_OVERRIDE_KEYS.has(sk)) {
+          const rows = sanitizeStaffingRows(sv);
+          if (rows) {
+            (staffing as Record<string, StaffingRow[]>)[sk] = rows;
+            hasAny = true;
+          }
+        }
+      }
+      if (hasAny) result.staffing = staffing;
+    }
+  }
+
+  return result;
+}
+
 /**
  * Apply a preset: set the enabledItems to the preset's defaults, but
  * preserve any rate overrides the user has entered.
