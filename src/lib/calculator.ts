@@ -144,11 +144,22 @@ export interface LayeredBreakdown {
   };
 }
 
+export type WarningLevel = 'info' | 'caution' | 'warning';
+
+export interface BudgetWarning {
+  level: WarningLevel;
+  message: string;
+  /** Which line item this warning is attached to (null = top-level). */
+  lineItemId?: LineItemId;
+}
+
 /** Budget worksheet: a unified list of all possible line items with overrides applied. */
 export interface BudgetWorksheetOutput {
   items: BudgetLineItem[];
   /** Total of enabled items only. */
   total: CostRange;
+  /** Appropriateness warnings based on the current configuration. */
+  warnings: BudgetWarning[];
 }
 
 export interface BudgetLineItem extends LineItem {
@@ -971,7 +982,84 @@ function buildBudgetWorksheet(
   const enabledCosts = items.filter((i) => i.enabled).map((i) => i.cost);
   const total = enabledCosts.length > 0 ? addRanges(...enabledCosts) : { low: 0, high: 0 };
 
-  return { items, total };
+  const warnings = generateBudgetWarnings(inputs, items, enabledItems);
+
+  return { items, total, warnings };
+}
+
+// ---------------------------------------------------------------------------
+// Budget warnings — appropriateness flags for the worksheet configuration
+// ---------------------------------------------------------------------------
+
+function generateBudgetWarnings(
+  inputs: MatterInputs,
+  items: BudgetLineItem[],
+  enabledItems?: Set<LineItemId>,
+): BudgetWarning[] {
+  const warnings: BudgetWarning[] = [];
+  const on = (id: LineItemId) => items.find((i) => i.lineItemId === id)?.enabled ?? false;
+
+  // Privilege review disabled on a matter that requires it
+  if (inputs.privilegeRequired && !on('humanPrivilege')) {
+    warnings.push({
+      level: 'warning',
+      message: 'Privilege review is disabled but this matter requires it. Producing privileged documents can waive privilege.',
+      lineItemId: 'humanPrivilege',
+    });
+  }
+
+  // Adversarial matter with no human QC layer at all
+  if (inputs.matterType === 'adversarial' && on('aiReview') && !on('humanReview')) {
+    if (inputs.defensibility === 'high') {
+      warnings.push({
+        level: 'caution',
+        message: 'High-defensibility adversarial matter with AI-only review. Consider adding human QC — Rule 26(g) requires a "reasonable inquiry" that courts may interpret as requiring human validation.',
+      });
+    }
+  }
+
+  // Human review enabled — check timeline feasibility
+  if (on('humanReview')) {
+    const time = enabledItems?.has('aiReview')
+      ? timeTraditionalTar(inputs)
+      : timeHumanReview(inputs);
+    if (!time.feasible) {
+      warnings.push({
+        level: 'warning',
+        message: `Human review requires ~${time.weeksEstimate} weeks with standard staffing, but your timeline is ${inputs.weeks} weeks. Increase staffing or extend the timeline.`,
+        lineItemId: 'humanReview',
+      });
+    }
+  }
+
+  // AI review without hosting
+  if (on('aiReview') && !on('hosting')) {
+    warnings.push({
+      level: 'info',
+      message: 'AI review typically requires a hosting platform. Confirm your vendor bundles hosting or add it separately.',
+      lineItemId: 'hosting',
+    });
+  }
+
+  // No project management on large matters
+  if (!on('projectManagement') && inputs.documentCount > 50_000) {
+    warnings.push({
+      level: 'caution',
+      message: 'No project management on a matter with 50K+ documents. Vendor coordination, QC, and timeline management typically require dedicated PM.',
+      lineItemId: 'projectManagement',
+    });
+  }
+
+  // Post-production / investigation with heavy human review
+  if (inputs.matterType === 'post_production' && on('humanReview') && !on('aiReview')) {
+    warnings.push({
+      level: 'info',
+      message: 'Post-production analysis with pure human review is unusually expensive. AI-augmented workflows are typically a better fit when defensibility constraints are lower.',
+      lineItemId: 'humanReview',
+    });
+  }
+
+  return warnings;
 }
 
 // ---------------------------------------------------------------------------
@@ -1001,4 +1089,60 @@ export function formatCost(c: CostRange): string {
     return `$${Math.round(n).toLocaleString('en-US')}`;
   };
   return `${fmt(c.low)} – ${fmt(c.high)}`;
+}
+
+export function formatBudgetAsText(output: CalculatorOutput): string {
+  const { inputs, budget } = output;
+  const lines: string[] = [];
+
+  lines.push('DOCUMENT REVIEW BUDGET');
+  lines.push('═'.repeat(40));
+  lines.push('');
+
+  lines.push(`Matter: ${inputs.matterType.replace('_', ' ')} | ${formatNumber(inputs.documentCount)} docs | ${formatGB(inputs.gigabytes)} | ${inputs.weeks} weeks`);
+  if (inputs.privilegeRequired) {
+    lines.push(`Privilege: ${(inputs.privilegeFraction * 100).toFixed(0)}% of corpus`);
+  }
+  lines.push('');
+
+  const enabledItems = budget.items.filter((i) => i.enabled);
+  const maxLabelLen = Math.max(...enabledItems.map((i) => i.label.length));
+
+  for (const item of enabledItems) {
+    const costStr = item.cost.low === item.cost.high
+      ? formatCostExact(item.cost.low)
+      : formatCost(item.cost);
+    const marker = item.isOverridden ? ' *' : '';
+    lines.push(`  ${item.label.padEnd(maxLabelLen + 2)}${costStr}${marker}`);
+  }
+
+  lines.push('  ' + '─'.repeat(maxLabelLen + 16));
+  const totalStr = budget.total.low === budget.total.high
+    ? formatCostExact(budget.total.low)
+    : formatCost(budget.total);
+  lines.push(`  ${'TOTAL'.padEnd(maxLabelLen + 2)}${totalStr}`);
+
+  if (enabledItems.some((i) => i.isOverridden)) {
+    lines.push('');
+    lines.push('* = customized rate (differs from industry benchmark)');
+  }
+
+  if (budget.warnings.length > 0) {
+    lines.push('');
+    lines.push('Warnings:');
+    for (const w of budget.warnings) {
+      const prefix = w.level === 'warning' ? '⚠' : w.level === 'caution' ? '△' : 'ℹ';
+      lines.push(`  ${prefix} ${w.message}`);
+    }
+  }
+
+  lines.push('');
+  lines.push('Generated by LegalHack Cost Modeler — legalhack.io/cost-modeler');
+
+  return lines.join('\n');
+}
+
+function formatCostExact(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(2)}M`;
+  return `$${Math.round(n).toLocaleString('en-US')}`;
 }

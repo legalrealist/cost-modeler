@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { RotateCcw } from 'lucide-react';
-import type { CalculatorOutput, CostRange, BudgetLineItem } from '@/lib/calculator';
-import { formatCost } from '@/lib/calculator';
+import { RotateCcw, Copy, Check, AlertTriangle, Info } from 'lucide-react';
+import type { CalculatorOutput, CostRange, BudgetLineItem, BudgetWarning } from '@/lib/calculator';
+import { formatCost, formatBudgetAsText } from '@/lib/calculator';
 import type {
   RateOverrides,
   WorkflowPreset,
@@ -42,13 +42,23 @@ export function BudgetWorksheet({
   onStaffingOverride,
   onResetBudget,
 }: BudgetWorksheetProps) {
-  const { items, total } = output.budget;
+  const { items, total, warnings } = output.budget;
   const anyOverrides = hasOverrides(budget.overrides);
   const allOverridden = items
     .filter((i) => i.enabled)
     .every((i) => i.isOverridden);
 
   const [expandedStaffing, setExpandedStaffing] = useState<Set<LineItemId>>(new Set());
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    const text = formatBudgetAsText(output);
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch { /* clipboard blocked */ }
+  };
 
   const toggleStaffing = (id: LineItemId) => {
     setExpandedStaffing((prev) => {
@@ -72,12 +82,18 @@ export function BudgetWorksheet({
               Click any rate to customize. Benchmark ranges shown as reference.
             </p>
           </div>
-          {anyOverrides && (
-            <Button variant="ghost" size="sm" onClick={onResetBudget} className="text-xs">
-              <RotateCcw className="h-3 w-3" />
-              Reset all
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="sm" onClick={handleCopy} className="text-xs">
+              {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
+              {copied ? 'Copied' : 'Copy budget'}
             </Button>
-          )}
+            {anyOverrides && (
+              <Button variant="ghost" size="sm" onClick={onResetBudget} className="text-xs">
+                <RotateCcw className="h-3 w-3" />
+                Reset all
+              </Button>
+            )}
+          </div>
         </div>
 
         {/* Preset toggle */}
@@ -138,6 +154,14 @@ export function BudgetWorksheet({
             </tr>
           </tfoot>
         </table>
+
+        {warnings.length > 0 && (
+          <div className="mt-3 space-y-1.5">
+            {warnings.map((w, i) => (
+              <WarningBanner key={i} warning={w} />
+            ))}
+          </div>
+        )}
 
         {!allOverridden && (
           <p className="text-[10px] text-muted-foreground mt-2">
@@ -211,6 +235,22 @@ function PresetButton({
     >
       {label}
     </button>
+  );
+}
+
+const WARNING_STYLES: Record<BudgetWarning['level'], string> = {
+  warning: 'bg-red-50 text-red-800 border-red-200',
+  caution: 'bg-amber-50 text-amber-800 border-amber-200',
+  info: 'bg-blue-50 text-blue-800 border-blue-200',
+};
+
+function WarningBanner({ warning }: { warning: BudgetWarning }) {
+  const Icon = warning.level === 'info' ? Info : AlertTriangle;
+  return (
+    <div className={cn('flex items-start gap-2 px-3 py-2 rounded-md border text-xs', WARNING_STYLES[warning.level])}>
+      <Icon className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+      <span>{warning.message}</span>
+    </div>
   );
 }
 
