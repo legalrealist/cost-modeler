@@ -63,7 +63,6 @@ export function StaffingDrilldown({
                 <StaffingRowInput
                   key={row.role}
                   row={row}
-                  isOverridden={hasOverride}
                   onHoursChange={(v) => updateRow(i, 'hours', v)}
                   onRateChange={(v) => updateRow(i, 'rate', v)}
                 />
@@ -90,12 +89,10 @@ export function StaffingDrilldown({
 
 function StaffingRowInput({
   row,
-  isOverridden,
   onHoursChange,
   onRateChange,
 }: {
   row: StaffingRow;
-  isOverridden: boolean;
   onHoursChange: (v: number) => void;
   onRateChange: (v: number) => void;
 }) {
