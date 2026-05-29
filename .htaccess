@@ -1,13 +1,13 @@
 # Serve built files from dist/
 <IfModule mod_rewrite.c>
   RewriteEngine On
-  RewriteBase /cost-modeler/
 
-  # If the request maps to a real file/dir in dist/, serve it
-  RewriteCond %{DOCUMENT_ROOT}/cost-modeler/dist/%{REQUEST_URI} -f [OR]
-  RewriteCond %{DOCUMENT_ROOT}/cost-modeler/dist/%{REQUEST_URI} -d
-  RewriteRule ^(.*)$ dist/$1 [L]
+  # Already inside dist/ — stop
+  RewriteRule ^dist/ - [L]
 
-  # Otherwise serve dist/index.html (SPA fallback)
-  RewriteRule ^(?!dist/).*$ dist/index.html [L]
+  # Static assets — proxy to dist/assets/
+  RewriteRule ^(assets/.*)$ dist/$1 [L]
+
+  # Everything else — SPA fallback to dist/index.html
+  RewriteRule ^.*$ dist/index.html [L]
 </IfModule>

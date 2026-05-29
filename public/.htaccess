@@ -1,13 +1,3 @@
-# SPA routing for /cost-modeler/
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteBase /cost-modeler/
-  RewriteRule ^index\.html$ - [L]
-  RewriteCond %{REQUEST_FILENAME} !-f
-  RewriteCond %{REQUEST_FILENAME} !-d
-  RewriteRule . /cost-modeler/index.html [L]
-</IfModule>
-
 # Cache static assets aggressively (Vite hashes filenames)
 <IfModule mod_expires.c>
   ExpiresActive On
