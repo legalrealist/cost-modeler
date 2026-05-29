@@ -4,8 +4,8 @@
   "version": "0.1.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
+    "dev": "vite dev.html",
+    "build": "tsc -b && vite build && mv dev.html index.html",
     "preview": "vite preview"
   },
   "dependencies": {

@@ -3,10 +3,13 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 
 export default defineConfig({
-  base: '/cost-modeler/',
+  base: './',
   build: {
     outDir: '.',
     emptyOutDir: false,
+    rollupOptions: {
+      input: 'dev.html',
+    },
   },
   plugins: [react()],
   resolve: {
