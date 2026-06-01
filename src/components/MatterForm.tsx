@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { MatterInputs } from '@/lib/calculator';
 import { CORPUS_MIXES } from '@/lib/pricing-data';
@@ -20,8 +20,15 @@ interface MatterFormProps {
   onChangeGigabytes: (gb: number) => void;
 }
 
+const DOC_PRESETS = [250_000, 500_000, 750_000, 1_000_000, 1_500_000, 2_000_000];
+
 export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+
+  const docPresetValue = useMemo(() => {
+    const match = DOC_PRESETS.find(p => p === inputs.documentCount);
+    return match ? String(match) : 'custom';
+  }, [inputs.documentCount]);
 
   return (
     <Card>
@@ -29,45 +36,67 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormPr
         <CardTitle className="text-lg">Matter inputs</CardTitle>
       </CardHeader>
       <CardContent className="space-y-5">
-        {/* Volume — both doc count and GB visible, kept in sync */}
+        {/* Volume */}
         <div>
-          <Label className="text-sm font-medium">Volume</Label>
-          <div className="grid grid-cols-2 gap-3 mt-1.5">
-            <div>
-              <Label htmlFor="docCount" className="text-xs text-muted-foreground font-normal">
-                Documents
-              </Label>
-              <Input
-                id="docCount"
-                type="number"
-                min={0}
-                step={1000}
-                value={Math.round(inputs.documentCount)}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  onChange({ documentCount: Number.isFinite(v) && v >= 0 ? v : 0 });
-                }}
-              />
+          <Label className="text-sm font-medium">Document volume</Label>
+          <Select
+            value={docPresetValue}
+            onValueChange={(v) => {
+              if (v !== 'custom') {
+                onChange({ documentCount: Number(v) });
+              }
+            }}
+          >
+            <SelectTrigger className="mt-1.5">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {DOC_PRESETS.map((n) => (
+                <SelectItem key={n} value={String(n)}>
+                  {n >= 1_000_000 ? `${(n / 1_000_000).toFixed(n % 1_000_000 === 0 ? 0 : 1)}M` : `${(n / 1_000).toFixed(0)}K`} documents
+                </SelectItem>
+              ))}
+              <SelectItem value="custom">Custom</SelectItem>
+            </SelectContent>
+          </Select>
+          {docPresetValue === 'custom' && (
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <div>
+                <Label htmlFor="docCount" className="text-xs text-muted-foreground font-normal">
+                  Documents
+                </Label>
+                <Input
+                  id="docCount"
+                  type="number"
+                  min={0}
+                  step={1000}
+                  value={Math.round(inputs.documentCount)}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onChange({ documentCount: Number.isFinite(v) && v >= 0 ? v : 0 });
+                  }}
+                />
+              </div>
+              <div>
+                <Label htmlFor="gigabytes" className="text-xs text-muted-foreground font-normal">
+                  Gigabytes
+                </Label>
+                <Input
+                  id="gigabytes"
+                  type="number"
+                  min={0}
+                  step={1}
+                  value={Math.round(inputs.gigabytes)}
+                  onChange={(e) => {
+                    const v = Number(e.target.value);
+                    onChangeGigabytes(Number.isFinite(v) && v >= 0 ? v : 0);
+                  }}
+                />
+              </div>
             </div>
-            <div>
-              <Label htmlFor="gigabytes" className="text-xs text-muted-foreground font-normal">
-                Gigabytes
-              </Label>
-              <Input
-                id="gigabytes"
-                type="number"
-                min={0}
-                step={1}
-                value={Math.round(inputs.gigabytes)}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  onChangeGigabytes(Number.isFinite(v) && v >= 0 ? v : 0);
-                }}
-              />
-            </div>
-          </div>
+          )}
           <p className="text-xs text-muted-foreground mt-1.5">
-            Editing one updates the other based on the selected corpus mix ({CORPUS_MIXES[inputs.corpusMix].docsPerGb.toLocaleString()} docs/GB).
+            {Math.round(inputs.documentCount).toLocaleString()} docs · {Math.round(inputs.gigabytes)} GB ({CORPUS_MIXES[inputs.corpusMix].docsPerGb.toLocaleString()} docs/GB)
           </p>
         </div>
 
@@ -84,13 +113,17 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormPr
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
+              <SelectItem value="regulatory">Regulatory production (HSR / CID / subpoena)</SelectItem>
               <SelectItem value="adversarial">Adversarial litigation production</SelectItem>
               <SelectItem value="investigation">Internal investigation</SelectItem>
-              <SelectItem value="regulatory">Regulatory production (HSR / CID / subpoena)</SelectItem>
-              <SelectItem value="post_production">Post-production analysis</SelectItem>
               <SelectItem value="compliance">Compliance / breach response</SelectItem>
             </SelectContent>
           </Select>
+          {inputs.matterType === 'adversarial' && (
+            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mt-2">
+              *AI-assisted review has not been judicially blessed for adversarial litigation and must be negotiated via Rule 26(f) conference. Discuss with opposing counsel early — a Rule 26(f) stipulation on AI-assisted review avoids disputes at production.
+            </p>
+          )}
         </div>
 
         {/* Timeline */}
@@ -127,7 +160,7 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormPr
             <SelectContent>
               <SelectItem value="high">High — adversarial, sanctions risk</SelectItem>
               <SelectItem value="standard">Standard — regulatory, investigation</SelectItem>
-              <SelectItem value="low">Low — internal triage, post-production</SelectItem>
+              <SelectItem value="low">Low — internal triage, compliance</SelectItem>
             </SelectContent>
           </Select>
         </div>

@@ -6,7 +6,7 @@ import { DEFAULTS } from '@/lib/pricing-data';
 import {
   DEFAULT_ROLE_RATES,
   getDefaultTaskHours,
-  getRiskMultipliers,
+  getRiskProfile,
   type TaskHoursState,
   type StaffingRole,
   type RiskMatterType,
@@ -17,11 +17,11 @@ export const DEFAULT_INPUTS: MatterInputs = {
   documentCount: DEFAULTS.documentCount,
   gigabytes: 250_000 / 7_500,
   corpusMix: 'mixed',
-  matterType: 'adversarial',
+  matterType: 'regulatory',
   weeks: DEFAULTS.weeks,
   privilegeRequired: true,
   privilegeFraction: DEFAULTS.privilegeFraction,
-  defensibility: 'high',
+  defensibility: 'standard',
   hostingMonths: Math.ceil(DEFAULTS.weeks / 4) + DEFAULTS.hostingMonthsAfterMatter,
 };
 
@@ -111,12 +111,17 @@ export function useMatterInputs() {
   const [roleRates, setRoleRatesState] = useState<Record<StaffingRole, number>>({ ...DEFAULT_ROLE_RATES });
   const [taskHoursOverride, setTaskHoursOverrideState] = useState<TaskHoursState | null>(null);
 
-  const riskMultipliers = getRiskMultipliers(
+  const riskProfile = getRiskProfile(
     inputs.matterType as RiskMatterType,
     inputs.defensibility as RiskDefensibility,
   );
 
-  const defaultTaskHours = getDefaultTaskHours(inputs.documentCount, riskMultipliers);
+  const privilegeCount = inputs.privilegeRequired
+    ? Math.round(inputs.documentCount * inputs.privilegeFraction)
+    : 0;
+  const keyDocCount = Math.round(inputs.documentCount * 0.02);
+
+  const defaultTaskHours = getDefaultTaskHours(inputs.documentCount, privilegeCount, keyDocCount, riskProfile);
   const taskHours = taskHoursOverride ?? defaultTaskHours;
 
   const setRoleRate = useCallback((role: StaffingRole, value: number) => {
@@ -155,7 +160,7 @@ export function useMatterInputs() {
     roleRates,
     setRoleRate,
     taskHours,
-    riskMultipliers,
+    riskProfile,
     setTraditionalTaskHour,
     setAiTaskHour,
     resetTaskCalculator,

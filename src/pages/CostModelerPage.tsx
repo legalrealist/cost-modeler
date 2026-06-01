@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Scale, Share2, RotateCcw, Check } from 'lucide-react';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
-import { TaskCalculator } from '@/components/TaskCalculator';
+import { TaskCalculator, ClientInsights, computeTraditionalCosts, computeAiCosts } from '@/components/TaskCalculator';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -14,13 +14,25 @@ export function CostModelerPage() {
     roleRates,
     setRoleRate,
     taskHours,
-    riskMultipliers,
+    riskProfile,
     setTraditionalTaskHour,
     setAiTaskHour,
     resetTaskCalculator,
     reset,
   } = useMatterInputs();
   const [copied, setCopied] = useState(false);
+
+  const privFrac = inputs.privilegeRequired ? inputs.privilegeFraction : 0;
+  const traditionalBreakdown = useMemo(
+    () => computeTraditionalCosts(taskHours.traditional, roleRates, riskProfile),
+    [taskHours.traditional, roleRates, riskProfile],
+  );
+  const aiBreakdown = useMemo(
+    () => computeAiCosts(taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac),
+    [taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac],
+  );
+  const traditionalTotalHours = Object.values(taskHours.traditional).reduce((s, h) => s + h, 0);
+  const aiTotalHumanHours = aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate + aiBreakdown.roleHours.partner;
 
   const handleShare = async () => {
     const url = buildShareUrl(inputs);
@@ -90,6 +102,13 @@ export function CostModelerPage() {
                     <RotateCcw className="h-3 w-3" /> Reset
                   </Button>
                 </div>
+
+                <ClientInsights
+                  traditionalBreakdown={traditionalBreakdown}
+                  aiBreakdown={aiBreakdown}
+                  traditionalHours={traditionalTotalHours}
+                  aiHumanHours={aiTotalHumanHours}
+                />
               </div>
 
               <div className="space-y-6 min-w-0">
@@ -99,9 +118,8 @@ export function CostModelerPage() {
                   traditionalTaskHours={taskHours.traditional}
                   aiTaskHours={taskHours.ai}
                   roleRates={roleRates}
-                  aiEfficiency={riskMultipliers.aiEfficiencyReduction}
-                  privilegeFraction={inputs.privilegeFraction}
-                  riskLabel={getRiskLabel(inputs.matterType, inputs.defensibility)}
+                  riskProfile={riskProfile}
+                  privilegeFraction={inputs.privilegeRequired ? inputs.privilegeFraction : 0}
                   onTraditionalTaskChange={setTraditionalTaskHour}
                   onAiTaskChange={setAiTaskHour}
                   onRoleRateChange={setRoleRate}
@@ -118,24 +136,6 @@ export function CostModelerPage() {
   );
 }
 
-function getRiskLabel(matterType: string, defensibility: string): string {
-  const labels: Record<string, string> = {
-    'adversarial:high': 'Maximum oversight',
-    'adversarial:standard': 'High oversight',
-    'adversarial:low': 'Standard oversight',
-    'regulatory:high': 'High oversight',
-    'regulatory:standard': 'Moderate oversight',
-    'investigation:standard': 'Moderate oversight',
-    'investigation:low': 'Reduced oversight',
-    'post_production:high': 'Minimal oversight',
-    'post_production:standard': 'Minimal oversight',
-    'post_production:low': 'Minimal oversight',
-    'compliance:high': 'Minimal oversight',
-    'compliance:standard': 'Minimal oversight',
-    'compliance:low': 'Minimal oversight',
-  };
-  return labels[`${matterType}:${defensibility}`] ?? 'Standard oversight';
-}
 
 function Disclaimer() {
   return (
@@ -158,7 +158,7 @@ function Disclaimer() {
         counterparty.
       </p>
       <p>
-        Built as a companion to the LegalHack Legal AI Landscape series. Source citations
+        Built as a companion to the LegalRealist AI Landscape series. Source citations
         link directly to the underlying surveys and benchmarks; no vendor relationships.
       </p>
     </div>
