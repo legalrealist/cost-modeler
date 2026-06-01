@@ -1,85 +1,66 @@
-# Document Review Cost Modeler
+# eDiscovery Cost Calculator
 
-Companion to *The Legal AI Landscape* series on legalhack.io. A static SPA that takes a description of a document review matter and produces cost-and-time estimates across six delivery models, with citations to the underlying pricing surveys.
+Compare traditional vs AI-enhanced eDiscovery workflows. AI handles document processing so attorneys focus on judgment work — human corrections feed back to improve accuracy.
 
-Lives at `legalhack.io/cost-modeler/`.
+Live at [legalhack.io/budget/](https://legalhack.io/budget/). Companion to the [LegalRealist AI Landscape](https://legalrealist.ai) series.
+
+## What it does
+
+- **Two-workflow comparison** — Traditional (contract attorneys + law firm QC) vs AI-Enhanced (AI document processing + attorney judgment & QC)
+- **Throughput-based hours** — 50 docs/hr initial review, 20 privilege, 5 privilege log, 10 key doc ID
+- **9 risk profiles** — QC depth, junior/senior allocation, and AI efficiency tied to matter type (adversarial, regulatory, investigation, compliance) × defensibility level
+- **AI workflow tuning** — adjustable AI efficiency gain (0–40%) and managed review shift (0–60% of volume QC from associates to contract attorneys)
+- **Cost breakdown** — separates AI Processing, Managed Review ($50/hr), and Law Firm (junior/senior/partner at $750–$1,500/hr)
+- **Client insights** — financial benefits, efficiency gains, quality & feedback loop, questions to ask your law firm, course correction scenarios
+- **Click-to-edit everything** — task hours, billing rates, document volume, risk profile
 
 ## Stack
 
-- Vite + React 18 + TypeScript
-- Tailwind CSS + shadcn/ui primitives (inlined)
-- No backend. Inputs encoded in URL query params for shareable links.
-- ~95 KB gzipped JS, ~5 KB gzipped CSS.
+- Vite 5 + React 18 + TypeScript 5
+- Tailwind CSS + shadcn/ui
+- Recharts (stacked bar chart)
+- No backend — inputs encoded in URL query params for shareable links
 
-## What's in here
+## Key files
 
-- `src/lib/pricing-data.ts` — every number with a citation. Edit this file when the underlying surveys update; no code changes needed.
-- `src/lib/calculator.ts` — pure functions that compute cost ranges and time estimates. Fully testable with no UI dependencies.
-- `src/lib/use-inputs.ts` — URL-state hook that keeps inputs in query params for shareable links.
-- `src/components/MatterForm.tsx` — five-input form with corpus-mix advanced toggle.
-- `src/components/ResultsTable.tsx` — six-row delivery model comparison with hover citations.
-- `src/components/LayeredBreakdown.tsx` — modern vs. traditional side-by-side line-item math.
-- `src/components/EditorialSummary.tsx` — opinionated summary card and recall reference.
+- `src/lib/rate-overrides.ts` — risk profiles, throughput rates, task hour calculations
+- `src/lib/use-inputs.ts` — URL-state hook, AI efficiency + managed review shift state
+- `src/components/TaskCalculator.tsx` — cost computation, cost cards, bar chart, savings analysis, client insights
+- `src/components/MatterForm.tsx` — matter inputs with document volume presets
+- `src/pages/CostModelerPage.tsx` — page layout, two-column form + results
 
 ## Local development
 
 ```bash
 npm install
 npm run dev
-# Opens at http://localhost:5173/cost-modeler/
+# Opens at http://localhost:5173/index.dev.html
 ```
 
 ## Production build
 
 ```bash
 npm run build
-npm run preview
-# Preview at http://localhost:4173/cost-modeler/
 ```
 
-Always preview the production build before deploying — `vite preview` catches base-path bugs and SPA-routing edge cases that don't show up in `dev`.
+Deploys to Hostinger via hPanel Git auto-deploy. Build output goes to repo root (`index.html`, `assets/`).
 
-## Deploy to Hostinger
+## Billing rates
 
-The build output goes to `dist/`. Upload its contents to:
+Rates are client-facing billing rates validated against Am Law 2025–2026 surveys (Thomson Reuters, Valeo Partners, EDRM):
 
-```
-~/domains/legalhack.io/public_html/cost-modeler/
-```
+| Role | Rate |
+|------|------|
+| Contract Attorney | $50/hr |
+| Junior Associate | $750/hr |
+| Senior Associate | $1,000/hr |
+| Partner | $1,500/hr |
 
-The `.htaccess` file is in `public/` and gets copied into `dist/` at build time. It handles SPA routing, asset caching, and gzip.
+## AI processing rates
 
-```bash
-# From local machine after npm run build:
-rsync -avz --delete -e "ssh -p 65002" \
-  ./dist/ \
-  u123456789@legalhack.io:~/domains/legalhack.io/public_html/cost-modeler/
-```
-
-Replace `65002` with your Hostinger SSH port and `u123456789` with your hosting account ID.
-
-## Updating pricing data
-
-When the next ComplexDiscovery survey ships, or when DecoverAI republishes its benchmark:
-
-1. Edit `src/lib/pricing-data.ts` — update the relevant `low`/`high` fields.
-2. If a new source needs to be added, add it to the `SOURCES` registry at the top of the file with a label, URL, and `asOf` date.
-3. Rebuild and redeploy.
-
-No other code changes needed. The calculator and UI read from the data file at runtime.
-
-## Editorial decisions baked in
-
-- **GB → docs default: 7,500** (Digital WarRoom 2025 sample of 150M docs, configurable per matter)
-- **Privilege population default: 8%** (user-editable)
-- **Hosting time: matter timeline + 6 months** (user-editable)
-- **Appropriateness flags: cautious** — yellow over green when there's any procedural exposure, red only when the model fundamentally can't satisfy the matter type
-- **Editorial summary: opinionated** — calls out the cost spread between modern and traditional configurations as a structural finding
-- **Spread calculation excludes raw API** — it's not a real procurement option for most matter types, and including it produces misleading 50–100× spreads. Raw API is shown in the table; just not in the headline.
-
-## Things to verify before launch
-
-1. **Plausible domain** — the script in `index.html` is configured for `legalhack.io`. Verify or adjust.
-2. **Number sanity** — run the included `test-calculator.ts` against `tsx test-calculator.ts` to see scenario outputs and verify against your editorial intuition.
-3. **Share URL test** — generate a shareable URL, paste in incognito, confirm inputs populate.
-4. **Mobile layout** — the form is 380px wide on desktop; on mobile it wraps under the results. Verify on a phone before launch.
+| Task | Per-doc rate |
+|------|-------------|
+| Initial review | $0.15 |
+| Privilege review | $0.35 |
+| Privilege log | $0.50 |
+| Key doc ID | $0.50 |
