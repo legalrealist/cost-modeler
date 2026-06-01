@@ -76,9 +76,9 @@ export function CostModelerPage() {
                 eDiscovery cost calculator
               </h1>
               <p className="text-muted-foreground mt-2 max-w-3xl">
-                Compare traditional human review vs AI-enhanced workflows. Configure task hours,
-                staffing rates, and matter risk profile — click any number to edit. Defaults
-                scale with document count and risk level.
+                Compare traditional review vs AI-enhanced workflows where AI handles document
+                processing and attorneys focus on judgment work. Human corrections feed back
+                to improve AI accuracy. Click any number to edit.
               </p>
             </div>
 

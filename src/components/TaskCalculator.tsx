@@ -681,8 +681,8 @@ export function TaskCalculator({
               </div>
 
               <TaskGroup
-                title="AI Processing"
-                description="Automated by AI — no human hours required"
+                title="AI Document Processing"
+                description="AI handles volume processing — human corrections feed back to improve accuracy"
               >
                 <AiProcessingRow label="Initial Review" />
                 <AiProcessingRow label="Privilege Review" />
@@ -691,8 +691,8 @@ export function TaskCalculator({
               </TaskGroup>
 
               <TaskGroup
-                title="Human Quality Control"
-                description="Enhanced efficiency with AI assistance"
+                title="Attorney Judgment & QC"
+                description="Attorneys focus on nuanced review, edge cases, and correcting AI decisions"
               >
                 <TaskRow
                   label="Second Level Review"
@@ -790,7 +790,7 @@ export function TaskCalculator({
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">AI workflow tuning</CardTitle>
           <p className="text-xs text-muted-foreground">
-            Adjust how much AI speeds up QC work and how much volume QC shifts from associates to managed review.
+            AI handles document processing so attorneys can focus on higher-value judgment work. Human corrections feed back to improve AI accuracy through the review.
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -817,14 +817,14 @@ export function TaskCalculator({
                 <span>40% faster</span>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                How much AI pre-screening reduces human QC hours. Profile default: {Math.round((1 - riskProfile.aiEfficiency) * 100)}%.
+                AI pre-screens documents so attorneys review fewer items and focus on edge cases. Improves as human corrections feed back. Profile default: {Math.round((1 - riskProfile.aiEfficiency) * 100)}%.
               </p>
             </div>
 
             {/* Managed Review Shift */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="text-sm font-medium">Shift to managed review</label>
+                <label className="text-sm font-medium">Volume QC to managed review</label>
                 <span className="text-sm font-mono font-semibold">
                   {Math.round(managedReviewShift * 100)}%
                 </span>
@@ -843,7 +843,7 @@ export function TaskCalculator({
                 <span>60% to contract attys</span>
               </div>
               <p className="text-[10px] text-muted-foreground mt-1">
-                With AI pre-screening, volume QC can shift from junior associates ($750/hr) to contract attorneys ($50/hr), making the law firm team leaner.
+                AI pre-screening makes volume QC straightforward enough for contract attorneys, freeing associates for nuanced privilege review, key document analysis, and case strategy.
               </p>
             </div>
           </div>
@@ -860,14 +860,14 @@ export function TaskCalculator({
           <CostCard
             title="AI-Enhanced"
             breakdown={aiBreakdown}
-            subtitle="AI processing + human QC"
+            subtitle="AI processes documents, attorneys focus on judgment work"
             isAi
             docCount={docCount}
           />
           <CostCard
             title="Traditional"
             breakdown={traditionalBreakdown}
-            subtitle="Full human review workflow"
+            subtitle="Full human review — attorneys handle volume and judgment"
             docCount={docCount}
           />
         </div>
@@ -959,18 +959,18 @@ export function TaskCalculator({
                   </div>
                   <div className="bg-white/60 rounded p-2">
                     <div className="text-muted-foreground mb-0.5">
-                      {managedReviewShift > 0 ? 'Shifted to managed review' : 'Managed review eliminated'}
+                      {managedReviewShift > 0 ? 'Associates freed for judgment work' : 'Volume processing automated'}
                     </div>
                     <div className="font-mono font-semibold">
                       {managedReviewShift > 0 ? (
-                        <>{Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs at $50/hr</>
+                        <>{Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs volume QC → managed review</>
                       ) : (
-                        <>{Math.round(traditionalBreakdown.roleHours.contractAttorney).toLocaleString()} hrs eliminated</>
+                        <>{Math.round(traditionalBreakdown.roleHours.contractAttorney).toLocaleString()} hrs automated by AI</>
                       )}
                     </div>
                     <div className="text-muted-foreground font-mono mt-0.5">
                       {managedReviewShift > 0
-                        ? `= $${Math.round(aiBreakdown.roleCosts.contractAttorney).toLocaleString('en-US')} (vs $${Math.round(managedReviewEliminated).toLocaleString('en-US')} at associate rates)`
+                        ? `$${Math.round(aiBreakdown.roleCosts.contractAttorney).toLocaleString('en-US')} at $50/hr vs $${Math.round(managedReviewEliminated).toLocaleString('en-US')} at associate rates`
                         : `= $${Math.round(managedReviewCost).toLocaleString('en-US')} saved`}
                     </div>
                   </div>
@@ -1069,22 +1069,26 @@ export function ClientInsights({
 
           {/* Quality & Oversight */}
           <div>
-            <h4 className="font-semibold text-sm mb-2">Quality & Oversight Maintained</h4>
+            <h4 className="font-semibold text-sm mb-2">Quality & Continuous Improvement</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="font-medium mb-1">Human Oversight Structure</p>
+                <p className="font-medium mb-1">Human-AI Feedback Loop</p>
                 <div className="space-y-1 bg-secondary/20 rounded-md p-2">
-                  <div className="flex justify-between"><span>AI Initial Processing:</span><span className="font-medium">100% automation</span></div>
-                  <div className="flex justify-between"><span>Associate Quality Control:</span><span className="font-medium">{Math.round(aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate).toLocaleString()} hrs</span></div>
+                  <div className="flex justify-between"><span>AI Document Processing:</span><span className="font-medium">100% of corpus</span></div>
+                  <div className="flex justify-between"><span>Attorney Judgment & QC:</span><span className="font-medium">{Math.round(aiBreakdown.roleHours.contractAttorney + aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate).toLocaleString()} hrs</span></div>
                   <div className="flex justify-between"><span>Partner Strategic Review:</span><span className="font-medium">{Math.round(aiBreakdown.roleHours.partner).toLocaleString()} hrs</span></div>
                 </div>
+                <p className="text-[10px] text-muted-foreground mt-1.5">
+                  Human corrections feed back to improve AI accuracy — the model learns from attorney judgment calls throughout the review.
+                </p>
               </div>
               <div>
                 <p className="font-medium mb-1">Quality Protections</p>
                 <ul className="space-y-1">
-                  <li>• Two-level human review of all AI decisions</li>
-                  <li>• Senior attorney oversight on privilege calls</li>
-                  <li>• Complete audit trail of all decisions</li>
+                  <li>• Attorney corrections improve AI accuracy in real time</li>
+                  <li>• Senior oversight on privilege and key document calls</li>
+                  <li>• Complete audit trail of AI decisions and human overrides</li>
+                  <li>• AI flags edge cases for attorney judgment rather than guessing</li>
                 </ul>
               </div>
             </div>
@@ -1095,21 +1099,23 @@ export function ClientInsights({
             <h4 className="font-semibold text-sm mb-2">Realistic Expectations</h4>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <p className="font-medium mb-1">What AI Does Well</p>
+                <p className="font-medium mb-1">AI Handles the Processing</p>
                 <ul className="space-y-1">
-                  <li>• High-volume document classification</li>
+                  <li>• High-volume document classification and coding</li>
                   <li>• Consistent application of review criteria</li>
                   <li>• Pattern recognition across large datasets</li>
-                  <li>• Fast privilege identification</li>
+                  <li>• Initial privilege screening and flagging</li>
+                  <li>• Learns from attorney corrections throughout review</li>
                 </ul>
               </div>
               <div>
-                <p className="font-medium mb-1">What Still Requires Humans</p>
+                <p className="font-medium mb-1">Attorneys Focus on Judgment</p>
                 <ul className="space-y-1">
-                  <li>• Complex legal judgment calls</li>
-                  <li>• Case strategy and legal arguments</li>
-                  <li>• Client counseling and communication</li>
-                  <li>• Unusual document types or formats</li>
+                  <li>• Nuanced QC — reviewing and correcting AI decisions</li>
+                  <li>• Complex privilege determinations</li>
+                  <li>• Key document analysis and case strategy</li>
+                  <li>• Edge cases AI flags for human review</li>
+                  <li>• Client counseling on findings</li>
                 </ul>
               </div>
             </div>
@@ -1129,12 +1135,12 @@ export function ClientInsights({
                 </ul>
               </div>
               <div>
-                <p className="font-medium mb-1">Quality Control</p>
+                <p className="font-medium mb-1">Quality & Feedback Loop</p>
                 <ul className="space-y-1">
-                  <li>• "What's your quality control process for AI-reviewed documents?"</li>
+                  <li>• "How do attorney corrections feed back into the AI model?"</li>
+                  <li>• "How quickly does AI accuracy improve as reviewers correct decisions?"</li>
                   <li>• "How do you train the AI on our specific case issues?"</li>
-                  <li>• "How do you document AI decision rationale?"</li>
-                  <li>• "What's your error rate with AI review?"</li>
+                  <li>• "What's your error rate, and how does it trend through the review?"</li>
                 </ul>
               </div>
               <div>
@@ -1243,11 +1249,11 @@ function KeyTakeaways({
     if (aiBreakdown.roleCosts.contractAttorney > 0) {
       const shiftSavings = aiBreakdown.roleHours.contractAttorney * 750 - aiBreakdown.roleCosts.contractAttorney;
       insights.push(
-        `${Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs of volume QC shifted from associates ($750/hr) to managed review ($50/hr), saving ${fmt(shiftSavings)} on those hours alone.`
+        `AI pre-screening frees ${Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs of volume QC for managed review ($50/hr vs $750/hr), saving ${fmt(shiftSavings)} while associates focus on nuanced judgment work.`
       );
     } else {
       insights.push(
-        `AI eliminates all contract attorney hours (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved) by automating first-pass review.`
+        `AI automates all document processing (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved), freeing attorneys entirely for judgment-intensive tasks.`
       );
     }
   }
