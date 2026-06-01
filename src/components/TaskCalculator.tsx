@@ -7,6 +7,7 @@ import {
   type StaffingRole,
   type RiskProfile,
 } from '@/lib/rate-overrides';
+import { AI_PROCESSING_RATES } from '@/lib/pricing-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -54,13 +55,6 @@ export interface TaskCalculatorProps {
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-const AI_PROCESSING_RATES = {
-  initial: 0.15,
-  privilege: 0.35,
-  privilegeLog: 0.50,
-  keyDocId: 0.50,
-};
 
 const ROLE_ORDER: StaffingRole[] = [
   'contractAttorney',

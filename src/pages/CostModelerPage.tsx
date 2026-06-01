@@ -185,8 +185,10 @@ function Disclaimer() {
         counterparty.
       </p>
       <p>
-        Built as a companion to the LegalRealist AI Landscape series. Source citations
-        link directly to the underlying surveys and benchmarks; no vendor relationships.
+        Built as a companion to the{' '}
+        <a href="https://legalrealist.ai" className="underline hover:text-foreground">LegalRealist AI Landscape</a>{' '}
+        series. Rates sourced from ComplexDiscovery/EDRM Winter 2026 Survey, DecoverAI 2026
+        Benchmark, Am Law 2025–2026 billing surveys. No vendor relationships.
       </p>
     </div>
   );
