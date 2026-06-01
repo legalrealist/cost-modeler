@@ -187,7 +187,7 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes, riskProfile, p
         </button>
 
         {profileOpen && (
-          <div className="space-y-3 pl-5 border-l-2 border-secondary">
+          <div className="space-y-3 pl-5 border-l-2 border-indigo-200 bg-indigo-50/30 rounded-r-md p-3 -mr-2">
             {isCustomProfile && (
               <button
                 type="button"

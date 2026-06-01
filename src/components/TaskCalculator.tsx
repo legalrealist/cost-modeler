@@ -369,7 +369,7 @@ function CostCard({
     breakdown.roleHours.partner;
 
   return (
-    <Card className="flex-1">
+    <Card className={cn('flex-1', isAi ? 'bg-blue-50/40 border-blue-200/60' : 'bg-stone-50/40 border-stone-200/60')}>
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">{title}</CardTitle>
         {subtitle && (
@@ -538,8 +538,8 @@ export function TaskCalculator({
         <CardContent>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Traditional column */}
-            <div className="space-y-1">
-              <h4 className="text-sm font-semibold mb-3">
+            <div className="space-y-1 bg-stone-50/50 rounded-lg p-3 -m-1">
+              <h4 className="text-sm font-semibold mb-3 text-stone-800">
                 Traditional Approach
               </h4>
 
@@ -634,9 +634,9 @@ export function TaskCalculator({
             </div>
 
             {/* AI-Enhanced column */}
-            <div className="space-y-1">
+            <div className="space-y-1 bg-blue-50/50 rounded-lg p-3 -m-1">
               <div className="flex items-center gap-2 mb-3">
-                <h4 className="text-sm font-semibold">AI-Enhanced Approach</h4>
+                <h4 className="text-sm font-semibold text-blue-900">AI-Enhanced Approach</h4>
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                   {riskProfile.label}
                 </Badge>
@@ -715,7 +715,7 @@ export function TaskCalculator({
       {/* ------------------------------------------------------------------ */}
       {/* 2. Hourly Rates Section                                            */}
       {/* ------------------------------------------------------------------ */}
-      <Card>
+      <Card className="bg-amber-50/30 border-amber-200/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">Hourly rates</CardTitle>
           <p className="text-xs text-muted-foreground">
@@ -748,7 +748,7 @@ export function TaskCalculator({
       {/* ------------------------------------------------------------------ */}
       {/* 3. AI Tuning Controls                                              */}
       {/* ------------------------------------------------------------------ */}
-      <Card>
+      <Card className="bg-indigo-50/30 border-indigo-200/50">
         <CardHeader className="pb-2">
           <CardTitle className="text-lg">AI workflow tuning</CardTitle>
           <p className="text-xs text-muted-foreground">
@@ -835,7 +835,7 @@ export function TaskCalculator({
         </div>
 
         {/* Bar chart */}
-        <Card>
+        <Card className="bg-slate-50/40 border-slate-200/50">
           <CardContent className="pt-6">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={[
@@ -1229,7 +1229,7 @@ function KeyTakeaways({
   if (insights.length === 0) return null;
 
   return (
-    <Card>
+    <Card className="bg-teal-50/30 border-teal-200/50">
       <CardHeader className="pb-2">
         <CardTitle className="text-sm">Key takeaways</CardTitle>
       </CardHeader>
