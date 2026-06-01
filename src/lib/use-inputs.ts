@@ -110,6 +110,8 @@ export function useMatterInputs() {
   // --- Task calculator state ---
   const [roleRates, setRoleRatesState] = useState<Record<StaffingRole, number>>({ ...DEFAULT_ROLE_RATES });
   const [taskHoursOverride, setTaskHoursOverrideState] = useState<TaskHoursState | null>(null);
+  const [aiEfficiencyOverride, setAiEfficiencyOverride] = useState<number | undefined>(undefined);
+  const [managedReviewShift, setManagedReviewShift] = useState(0.30);
 
   const riskProfile = getRiskProfile(
     inputs.matterType as RiskMatterType,
@@ -145,12 +147,16 @@ export function useMatterInputs() {
   const resetTaskCalculator = useCallback(() => {
     setRoleRatesState({ ...DEFAULT_ROLE_RATES });
     setTaskHoursOverrideState(null);
+    setAiEfficiencyOverride(undefined);
+    setManagedReviewShift(0.30);
   }, []);
 
   const reset = useCallback(() => {
     setInputsState(DEFAULT_INPUTS);
     setRoleRatesState({ ...DEFAULT_ROLE_RATES });
     setTaskHoursOverrideState(null);
+    setAiEfficiencyOverride(undefined);
+    setManagedReviewShift(0.30);
   }, []);
 
   return {
@@ -161,6 +167,10 @@ export function useMatterInputs() {
     setRoleRate,
     taskHours,
     riskProfile,
+    aiEfficiencyOverride,
+    setAiEfficiencyOverride,
+    managedReviewShift,
+    setManagedReviewShift,
     setTraditionalTaskHour,
     setAiTaskHour,
     resetTaskCalculator,

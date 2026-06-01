@@ -40,9 +40,13 @@ export interface TaskCalculatorProps {
   roleRates: Record<StaffingRole, number>;
   riskProfile: RiskProfile;
   privilegeFraction: number;
+  aiEfficiencyOverride?: number;
+  managedReviewShift: number;
   onTraditionalTaskChange: (key: string, value: number) => void;
   onAiTaskChange: (key: string, value: number) => void;
   onRoleRateChange: (role: StaffingRole, value: number) => void;
+  onAiEfficiencyChange: (v: number) => void;
+  onManagedReviewShiftChange: (v: number) => void;
   onResetTaskHours?: () => void;
 }
 
@@ -125,15 +129,20 @@ export function computeAiCosts(
   riskProfile: RiskProfile,
   docCount: number,
   privilegeFraction = 0.08,
+  managedReviewShift = 0,
+  aiEfficiencyOverride?: number,
 ): CostBreakdown {
   const privilegeDocs = Math.round(docCount * privilegeFraction);
   const keyDocs = Math.round(docCount * 0.02);
-  const eff = riskProfile.aiEfficiency;
+  const eff = aiEfficiencyOverride ?? riskProfile.aiEfficiency;
   const jf = riskProfile.juniorFraction;
 
+  const rawJuniorVolumeQC = a.secondLevelReview * jf.volumeQC * eff;
+  const shiftedToManagedReview = rawJuniorVolumeQC * managedReviewShift;
+
   const juniorHours =
-    (a.secondLevelReview * jf.volumeQC +
-      a.secondLevelPrivilegeReview * jf.privilegeQC +
+    (rawJuniorVolumeQC - shiftedToManagedReview) +
+    (a.secondLevelPrivilegeReview * jf.privilegeQC +
       a.secondLevelPrivilegeLogDrafting * jf.privilegeQC +
       a.secondLevelKeyDocIdentification * jf.keyDocQC) * eff;
   const seniorHours =
@@ -143,7 +152,7 @@ export function computeAiCosts(
       a.secondLevelKeyDocIdentification * (1 - jf.keyDocQC)) * eff;
 
   const roleHours: RoleHours = {
-    contractAttorney: 0,
+    contractAttorney: shiftedToManagedReview,
     juniorAssociate: juniorHours,
     seniorAssociate: seniorHours,
     partner: a.secondLevelKeyDocIdentification * 0.5 * riskProfile.partnerInvolvement,
@@ -156,7 +165,7 @@ export function computeAiCosts(
     keyDocs * AI_PROCESSING_RATES.keyDocId;
 
   const roleCosts: Record<StaffingRole, number> = {
-    contractAttorney: 0,
+    contractAttorney: roleHours.contractAttorney * rates.contractAttorney,
     juniorAssociate: roleHours.juniorAssociate * rates.juniorAssociate,
     seniorAssociate: roleHours.seniorAssociate * rates.seniorAssociate,
     partner: roleHours.partner * rates.partner,
@@ -380,17 +389,22 @@ function CostCard({
   subtitle,
   isAi,
   docCount,
-  addOnCost,
 }: {
   title: string;
   breakdown: CostBreakdown;
   subtitle?: string;
   isAi?: boolean;
   docCount?: number;
-  addOnCost?: number;
 }) {
-  const isAddOn = addOnCost !== undefined && addOnCost > 0;
-  const combinedCost = isAddOn ? addOnCost + breakdown.totalCost : breakdown.totalCost;
+  const managedReviewCost = breakdown.roleCosts.contractAttorney;
+  const lawFirmCost =
+    breakdown.roleCosts.juniorAssociate +
+    breakdown.roleCosts.seniorAssociate +
+    breakdown.roleCosts.partner;
+  const lawFirmHours =
+    breakdown.roleHours.juniorAssociate +
+    breakdown.roleHours.seniorAssociate +
+    breakdown.roleHours.partner;
 
   return (
     <Card className="flex-1">
@@ -401,67 +415,77 @@ function CostCard({
         )}
       </CardHeader>
       <CardContent className="space-y-2">
-        {isAddOn ? (
-          <>
-            <div className="text-2xl font-bold font-mono">
-              +${Math.round(breakdown.totalCost).toLocaleString('en-US')}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              Combined with traditional: ${Math.round(combinedCost).toLocaleString('en-US')}
-              {docCount && docCount > 0 && (
-                <span className="ml-1">
-                  · ${(combinedCost / docCount).toFixed(2)}/doc
-                </span>
-              )}
-            </div>
-          </>
-        ) : (
-          <>
-            <div className="text-2xl font-bold font-mono">
-              ${Math.round(breakdown.totalCost).toLocaleString('en-US')}
-            </div>
-            <div className="text-[11px] text-muted-foreground">
-              {Math.round(breakdown.totalHours).toLocaleString('en-US')} total hours
-              {isAi && ' + AI processing'}
-              {docCount && docCount > 0 && (
-                <span className="ml-2">
-                  · ${(breakdown.totalCost / docCount).toFixed(2)}/doc
-                </span>
-              )}
-            </div>
-          </>
-        )}
+        <div className="text-2xl font-bold font-mono">
+          ${Math.round(breakdown.totalCost).toLocaleString('en-US')}
+        </div>
+        <div className="text-[11px] text-muted-foreground">
+          {Math.round(breakdown.totalHours).toLocaleString('en-US')} total hours
+          {isAi && ' + AI processing'}
+          {docCount && docCount > 0 && (
+            <span className="ml-2">
+              · ${(breakdown.totalCost / docCount).toFixed(2)}/doc
+            </span>
+          )}
+        </div>
 
-        {/* Breakdown */}
-        <div className="pt-2 border-t space-y-1">
-          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-            {isAddOn ? 'Cross-check cost' : 'Cost breakdown'}
-          </span>
-
+        {/* Breakdown by category */}
+        <div className="pt-2 border-t space-y-2">
+          {/* AI Processing */}
           {isAi && breakdown.aiProcessingCost > 0 && (
-            <div className="flex justify-between text-xs py-1 px-1.5 bg-primary/5 rounded">
-              <span className="font-medium text-primary">AI Processing</span>
-              <span className="font-mono font-medium text-primary">
-                ${Math.round(breakdown.aiProcessingCost).toLocaleString('en-US')}
-              </span>
+            <div>
+              <span className="text-[10px] font-medium text-primary uppercase tracking-wider">AI Processing</span>
+              <div className="flex justify-between text-xs py-1 px-1.5 bg-primary/5 rounded mt-0.5">
+                <span className="font-medium text-primary">Platform cost</span>
+                <span className="font-mono font-medium text-primary">
+                  ${Math.round(breakdown.aiProcessingCost).toLocaleString('en-US')}
+                </span>
+              </div>
             </div>
           )}
 
-          {ROLE_ORDER.map((role) => {
-            const cost = breakdown.roleCosts[role];
-            if (cost === 0) return null;
-            return (
-              <div
-                key={role}
-                className="flex justify-between text-xs py-1 px-1.5 bg-secondary/30 rounded"
-              >
-                <span>{STAFFING_ROLE_LABELS[role]}</span>
-                <span className="font-mono">
-                  ${Math.round(cost).toLocaleString('en-US')}
+          {/* Managed Review */}
+          {managedReviewCost > 0 && (
+            <div>
+              <span className="text-[10px] font-medium text-violet-600 uppercase tracking-wider">
+                Managed Review
+              </span>
+              <div className="flex justify-between text-xs py-1 px-1.5 bg-violet-50 rounded mt-0.5">
+                <span>Contract Attorney <span className="text-muted-foreground">({Math.round(breakdown.roleHours.contractAttorney).toLocaleString()} hrs)</span></span>
+                <span className="font-mono">${Math.round(managedReviewCost).toLocaleString('en-US')}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Law Firm */}
+          {lawFirmCost > 0 && (
+            <div>
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-medium text-amber-700 uppercase tracking-wider">
+                  Law Firm
+                </span>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  {Math.round(lawFirmHours).toLocaleString()} hrs · ${Math.round(lawFirmCost).toLocaleString('en-US')}
                 </span>
               </div>
-            );
-          })}
+              <div className="space-y-0.5 mt-0.5">
+                {(['juniorAssociate', 'seniorAssociate', 'partner'] as const).map((role) => {
+                  const cost = breakdown.roleCosts[role];
+                  if (cost === 0) return null;
+                  return (
+                    <div
+                      key={role}
+                      className="flex justify-between text-xs py-1 px-1.5 bg-amber-50/50 rounded"
+                    >
+                      <span>{STAFFING_ROLE_LABELS[role]} <span className="text-muted-foreground">({Math.round(breakdown.roleHours[role]).toLocaleString()} hrs)</span></span>
+                      <span className="font-mono">
+                        ${Math.round(cost).toLocaleString('en-US')}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>
@@ -479,14 +503,18 @@ export function TaskCalculator({
   roleRates,
   riskProfile,
   privilegeFraction,
+  aiEfficiencyOverride,
+  managedReviewShift,
   onTraditionalTaskChange,
   onAiTaskChange,
   onRoleRateChange,
+  onAiEfficiencyChange,
+  onManagedReviewShiftChange,
   onResetTaskHours,
 }: TaskCalculatorProps) {
   const t = traditionalTaskHours;
   const a = aiTaskHours;
-  const eff = riskProfile.aiEfficiency;
+  const eff = aiEfficiencyOverride ?? riskProfile.aiEfficiency;
   const jf = riskProfile.juniorFraction;
 
   const traditionalBreakdown = useMemo(
@@ -494,8 +522,8 @@ export function TaskCalculator({
     [t, roleRates, riskProfile],
   );
   const aiBreakdown = useMemo(
-    () => computeAiCosts(a, roleRates, riskProfile, docCount, privilegeFraction),
-    [a, roleRates, riskProfile, docCount, privilegeFraction],
+    () => computeAiCosts(a, roleRates, riskProfile, docCount, privilegeFraction, managedReviewShift, aiEfficiencyOverride),
+    [a, roleRates, riskProfile, docCount, privilegeFraction, managedReviewShift, aiEfficiencyOverride],
   );
   const savings = traditionalBreakdown.totalCost - aiBreakdown.totalCost;
   const savingsPct =
@@ -514,6 +542,7 @@ export function TaskCalculator({
     t.secondLevelKeyDocIdentification;
 
   const aiTotalHumanHours =
+    aiBreakdown.roleHours.contractAttorney +
     aiBreakdown.roleHours.juniorAssociate +
     aiBreakdown.roleHours.seniorAssociate +
     aiBreakdown.roleHours.partner;
@@ -755,7 +784,74 @@ export function TaskCalculator({
       </Card>
 
       {/* ------------------------------------------------------------------ */}
-      {/* 3. Cost Comparison Section                                         */}
+      {/* 3. AI Tuning Controls                                              */}
+      {/* ------------------------------------------------------------------ */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">AI workflow tuning</CardTitle>
+          <p className="text-xs text-muted-foreground">
+            Adjust how much AI speeds up QC work and how much volume QC shifts from associates to managed review.
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* AI Efficiency */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium">AI efficiency gain</label>
+                <span className="text-sm font-mono font-semibold">
+                  {Math.round((1 - eff) * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={40}
+                step={5}
+                value={Math.round((1 - eff) * 100)}
+                onChange={(e) => onAiEfficiencyChange(1 - Number(e.target.value) / 100)}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                <span>0% (no gain)</span>
+                <span>40% faster</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                How much AI pre-screening reduces human QC hours. Profile default: {Math.round((1 - riskProfile.aiEfficiency) * 100)}%.
+              </p>
+            </div>
+
+            {/* Managed Review Shift */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-sm font-medium">Shift to managed review</label>
+                <span className="text-sm font-mono font-semibold">
+                  {Math.round(managedReviewShift * 100)}%
+                </span>
+              </div>
+              <input
+                type="range"
+                min={0}
+                max={60}
+                step={10}
+                value={Math.round(managedReviewShift * 100)}
+                onChange={(e) => onManagedReviewShiftChange(Number(e.target.value) / 100)}
+                className="w-full accent-primary"
+              />
+              <div className="flex justify-between text-[10px] text-muted-foreground mt-0.5">
+                <span>0% (all associates)</span>
+                <span>60% to contract attys</span>
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1">
+                With AI pre-screening, volume QC can shift from junior associates ($750/hr) to contract attorneys ($50/hr), making the law firm team leaner.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ------------------------------------------------------------------ */}
+      {/* 4. Cost Comparison Section                                         */}
       {/* ------------------------------------------------------------------ */}
       <div className="space-y-3">
         <h3 className="text-lg font-semibold">Cost comparison</h3>
@@ -812,17 +908,77 @@ export function TaskCalculator({
         </Card>
 
         {/* Savings callout */}
-        {savings > 0 && (
-          <div className="flex items-center justify-center gap-3 bg-primary/5 border border-primary/20 rounded-md px-4 py-3">
-            <span className="text-sm font-medium">AI-Enhanced savings:</span>
-            <span className="text-lg font-bold font-mono text-primary">
-              ${Math.round(savings).toLocaleString('en-US')}
-            </span>
-            <Badge variant="secondary" className="text-xs">
-              {savingsPct.toFixed(1)}%
-            </Badge>
-          </div>
-        )}
+        {savings > 0 && (() => {
+          const tradLawFirmCost =
+            traditionalBreakdown.roleCosts.juniorAssociate +
+            traditionalBreakdown.roleCosts.seniorAssociate +
+            traditionalBreakdown.roleCosts.partner;
+          const aiLawFirmCost =
+            aiBreakdown.roleCosts.juniorAssociate +
+            aiBreakdown.roleCosts.seniorAssociate +
+            aiBreakdown.roleCosts.partner;
+          const lawFirmSavings = tradLawFirmCost - aiLawFirmCost;
+          const managedReviewCost = traditionalBreakdown.roleCosts.contractAttorney;
+          const managedReviewEliminated = managedReviewCost - aiBreakdown.roleCosts.contractAttorney;
+          const tradLawFirmHours =
+            traditionalBreakdown.roleHours.juniorAssociate +
+            traditionalBreakdown.roleHours.seniorAssociate +
+            traditionalBreakdown.roleHours.partner;
+          const aiLawFirmHours =
+            aiBreakdown.roleHours.juniorAssociate +
+            aiBreakdown.roleHours.seniorAssociate +
+            aiBreakdown.roleHours.partner;
+          const lawFirmHoursPct = tradLawFirmHours > 0
+            ? ((tradLawFirmHours - aiLawFirmHours) / tradLawFirmHours * 100)
+            : 0;
+
+          return (
+            <Card className="bg-emerald-50/50 border-emerald-200">
+              <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-semibold">Total savings</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg font-bold font-mono text-emerald-700">
+                      ${Math.round(savings).toLocaleString('en-US')}
+                    </span>
+                    <Badge variant="secondary" className="text-xs">
+                      {savingsPct.toFixed(0)}%
+                    </Badge>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-xs">
+                  <div className="bg-white/60 rounded p-2">
+                    <div className="text-muted-foreground mb-0.5">Law firm hours saved</div>
+                    <div className="font-mono font-semibold">
+                      {Math.round(tradLawFirmHours - aiLawFirmHours).toLocaleString()} hrs
+                      <span className="text-muted-foreground font-normal ml-1">({lawFirmHoursPct.toFixed(0)}%)</span>
+                    </div>
+                    <div className="text-muted-foreground font-mono mt-0.5">
+                      = ${Math.round(lawFirmSavings).toLocaleString('en-US')} saved
+                    </div>
+                  </div>
+                  <div className="bg-white/60 rounded p-2">
+                    <div className="text-muted-foreground mb-0.5">
+                      {managedReviewShift > 0 ? 'Shifted to managed review' : 'Managed review eliminated'}
+                    </div>
+                    <div className="font-mono font-semibold">
+                      {managedReviewShift > 0 ? (
+                        <>{Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs at $50/hr</>
+                      ) : (
+                        <>{Math.round(traditionalBreakdown.roleHours.contractAttorney).toLocaleString()} hrs eliminated</>
+                      )}
+                    </div>
+                    <div className="text-muted-foreground font-mono mt-0.5">
+                      {managedReviewShift > 0
+                        ? `= $${Math.round(aiBreakdown.roleCosts.contractAttorney).toLocaleString('en-US')} (vs $${Math.round(managedReviewEliminated).toLocaleString('en-US')} at associate rates)`
+                        : `= $${Math.round(managedReviewCost).toLocaleString('en-US')} saved`}
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })()}
 
         {/* Key takeaways */}
         <KeyTakeaways
@@ -1083,10 +1239,17 @@ function KeyTakeaways({
     );
   }
 
-  if (traditionalBreakdown.roleCosts.contractAttorney > 0 && aiBreakdown.roleCosts.contractAttorney === 0) {
-    insights.push(
-      `AI eliminates all contract attorney hours (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved) by automating first-pass review.`
-    );
+  if (traditionalBreakdown.roleCosts.contractAttorney > 0) {
+    if (aiBreakdown.roleCosts.contractAttorney > 0) {
+      const shiftSavings = aiBreakdown.roleHours.contractAttorney * 750 - aiBreakdown.roleCosts.contractAttorney;
+      insights.push(
+        `${Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs of volume QC shifted from associates ($750/hr) to managed review ($50/hr), saving ${fmt(shiftSavings)} on those hours alone.`
+      );
+    } else {
+      insights.push(
+        `AI eliminates all contract attorney hours (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved) by automating first-pass review.`
+      );
+    }
   }
 
   if (riskLabel) {

@@ -15,6 +15,10 @@ export function CostModelerPage() {
     setRoleRate,
     taskHours,
     riskProfile,
+    aiEfficiencyOverride,
+    setAiEfficiencyOverride,
+    managedReviewShift,
+    setManagedReviewShift,
     setTraditionalTaskHour,
     setAiTaskHour,
     resetTaskCalculator,
@@ -28,11 +32,11 @@ export function CostModelerPage() {
     [taskHours.traditional, roleRates, riskProfile],
   );
   const aiBreakdown = useMemo(
-    () => computeAiCosts(taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac),
-    [taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac],
+    () => computeAiCosts(taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac, managedReviewShift, aiEfficiencyOverride),
+    [taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac, managedReviewShift, aiEfficiencyOverride],
   );
   const traditionalTotalHours = Object.values(taskHours.traditional).reduce((s, h) => s + h, 0);
-  const aiTotalHumanHours = aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate + aiBreakdown.roleHours.partner;
+  const aiTotalHumanHours = aiBreakdown.roleHours.contractAttorney + aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate + aiBreakdown.roleHours.partner;
 
   const handleShare = async () => {
     const url = buildShareUrl(inputs);
@@ -120,9 +124,13 @@ export function CostModelerPage() {
                   roleRates={roleRates}
                   riskProfile={riskProfile}
                   privilegeFraction={inputs.privilegeRequired ? inputs.privilegeFraction : 0}
+                  aiEfficiencyOverride={aiEfficiencyOverride}
+                  managedReviewShift={managedReviewShift}
                   onTraditionalTaskChange={setTraditionalTaskHour}
                   onAiTaskChange={setAiTaskHour}
                   onRoleRateChange={setRoleRate}
+                  onAiEfficiencyChange={setAiEfficiencyOverride}
+                  onManagedReviewShiftChange={setManagedReviewShift}
                   onResetTaskHours={resetTaskCalculator}
                 />
 
