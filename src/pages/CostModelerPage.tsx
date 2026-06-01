@@ -137,6 +137,7 @@ export function CostModelerPage() {
                 {/* Primary: Task Calculator */}
                 <TaskCalculator
                   docCount={inputs.documentCount}
+                  weeks={inputs.weeks}
                   traditionalTaskHours={taskHours.traditional}
                   aiTaskHours={taskHours.ai}
                   roleRates={roleRates}

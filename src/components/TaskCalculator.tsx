@@ -35,6 +35,7 @@ export interface AiTaskHours {
 
 export interface TaskCalculatorProps {
   docCount: number;
+  weeks: number;
   traditionalTaskHours: TraditionalTaskHours;
   aiTaskHours: AiTaskHours;
   roleRates: Record<StaffingRole, number>;
@@ -458,8 +459,12 @@ function CostCard({
 // Main component
 // ---------------------------------------------------------------------------
 
+const REVIEWERS = 25;
+const WORK_WEEK_HOURS = 40;
+
 export function TaskCalculator({
   docCount,
+  weeks,
   traditionalTaskHours,
   aiTaskHours,
   roleRates,
@@ -511,8 +516,31 @@ export function TaskCalculator({
 
   const effBadge = eff < 1.0 ? `${Math.round((1 - eff) * 100)}% faster` : undefined;
 
+  const availableHours = weeks * REVIEWERS * WORK_WEEK_HOURS;
+  const traditionalWeeksNeeded = Math.ceil(traditionalTotalHours / (REVIEWERS * WORK_WEEK_HOURS));
+  const aiWeeksNeeded = Math.ceil(aiTotalHumanHours / (REVIEWERS * WORK_WEEK_HOURS));
+  const traditionalFeasible = traditionalTotalHours <= availableHours;
+  const aiFeasible = aiTotalHumanHours <= availableHours;
+
   return (
     <div className="space-y-6">
+      {/* Timeline feasibility warning */}
+      {!traditionalFeasible && (
+        <div className={cn(
+          'text-xs px-4 py-3 rounded-md border',
+          aiFeasible
+            ? 'bg-amber-50 border-amber-200 text-amber-800'
+            : 'bg-red-50 border-red-200 text-red-800'
+        )}>
+          <strong>Timeline check:</strong>{' '}
+          {aiFeasible ? (
+            <>Traditional review needs ~{traditionalWeeksNeeded} weeks at {REVIEWERS} reviewers — exceeds your {weeks}-week timeline. AI-enhanced fits at ~{aiWeeksNeeded} weeks.</>
+          ) : (
+            <>Both workflows exceed your {weeks}-week timeline at {REVIEWERS} reviewers. Traditional needs ~{traditionalWeeksNeeded} weeks, AI-enhanced ~{aiWeeksNeeded} weeks. Consider increasing staffing or extending the timeline.</>
+          )}
+        </div>
+      )}
+
       {/* ------------------------------------------------------------------ */}
       {/* 1. Task Hours Section                                              */}
       {/* ------------------------------------------------------------------ */}
