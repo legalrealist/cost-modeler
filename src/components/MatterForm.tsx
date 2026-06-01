@@ -177,6 +177,7 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes, riskProfile, p
         <button
           type="button"
           onClick={() => setProfileOpen(!profileOpen)}
+          aria-expanded={profileOpen}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           {profileOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -323,6 +324,7 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes, riskProfile, p
         <button
           type="button"
           onClick={() => setAdvancedOpen(!advancedOpen)}
+          aria-expanded={advancedOpen}
           className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           {advancedOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}

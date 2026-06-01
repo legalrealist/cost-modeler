@@ -96,7 +96,7 @@ export function CostModelerPage() {
             </div>
 
             {/* Two-column layout: form on left, results on right */}
-            <div className="grid lg:grid-cols-[380px_1fr] gap-6">
+            <div className="grid md:grid-cols-[340px_1fr] lg:grid-cols-[380px_1fr] gap-6">
               <div className="space-y-4">
                 <MatterForm
                   inputs={inputs}

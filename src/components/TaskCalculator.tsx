@@ -184,6 +184,7 @@ function InlineNumberInput({
   prefix,
   suffix,
   disabled,
+  ariaLabel,
 }: {
   value: number;
   onChange: (v: number) => void;
@@ -191,6 +192,7 @@ function InlineNumberInput({
   prefix?: string;
   suffix?: string;
   disabled?: boolean;
+  ariaLabel?: string;
 }) {
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
@@ -232,6 +234,7 @@ function InlineNumberInput({
             if (e.key === 'Enter') commit();
             if (e.key === 'Escape') setEditing(false);
           }}
+          aria-label={ariaLabel}
           className={cn(
             'px-1 py-0 text-xs font-mono text-right border border-ring rounded bg-background focus:outline-none focus:ring-1 focus:ring-ring',
             className,
@@ -247,6 +250,7 @@ function InlineNumberInput({
       type="button"
       onClick={startEdit}
       disabled={disabled}
+      aria-label={ariaLabel ? `Edit ${ariaLabel}` : undefined}
       className={cn(
         'text-xs font-mono px-1 py-0 rounded transition-colors',
         disabled
@@ -307,7 +311,7 @@ function TaskRow({
       <div className="flex-1 min-w-0">
         <span className="text-xs font-medium text-foreground">{label}</span>
         {allocation && (
-          <div className="text-[10px] text-muted-foreground mt-0.5">
+          <div className="text-[10px] text-muted-foreground mt-0.5 truncate">
             {allocation}
           </div>
         )}
@@ -318,6 +322,7 @@ function TaskRow({
           onChange={onChange}
           className="w-16"
           suffix="hrs"
+          ariaLabel={`${label} hours`}
         />
         {efficiencyBadge && (
           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
@@ -745,7 +750,7 @@ export function TaskCalculator({
           </p>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {ROLE_ORDER.map((role) => (
               <div
                 key={role}
@@ -760,6 +765,7 @@ export function TaskCalculator({
                   className="w-20"
                   prefix="$"
                   suffix="/hr"
+                  ariaLabel={`${STAFFING_ROLE_LABELS[role]} rate per hour`}
                 />
               </div>
             ))}
@@ -857,8 +863,9 @@ export function TaskCalculator({
         </div>
 
         {/* Bar chart */}
-        <Card className="bg-slate-50/40 border-slate-200/50">
+        <Card className="bg-slate-50/40 border-slate-200/50" aria-label="Cost comparison bar chart">
           <CardContent className="pt-6">
+            <div role="img" aria-label="Stacked bar chart comparing AI-Enhanced vs Traditional costs by role">
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={[
                 {
@@ -888,6 +895,7 @@ export function TaskCalculator({
                 <Bar dataKey="AI Processing" stackId="a" fill="#3b82f6" />
               </BarChart>
             </ResponsiveContainer>
+            </div>
           </CardContent>
         </Card>
 
@@ -1005,10 +1013,17 @@ export function ClientInsights({
 
   return (
     <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-      <CardHeader className="pb-2 cursor-pointer" onClick={() => setOpen(!open)}>
+      <CardHeader
+        className="pb-2 cursor-pointer"
+        onClick={() => setOpen(!open)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(!open); } }}
+        role="button"
+        tabIndex={0}
+        aria-expanded={open}
+      >
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm text-blue-900">Client insights</CardTitle>
-          <span className="text-xs text-blue-400">{open ? '▾' : '▸'}</span>
+          <span className="text-xs text-blue-400" aria-hidden="true">{open ? '▾' : '▸'}</span>
         </div>
       </CardHeader>
       {open && (
