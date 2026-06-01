@@ -178,44 +178,6 @@ export function computeAiCosts(
   return { roleCosts, roleHours, aiProcessingCost, totalHours, totalCost };
 }
 
-export function computeCrossCheckCosts(
-  rates: Record<StaffingRole, number>,
-  docCount: number,
-  privilegeFraction = 0.08,
-): CostBreakdown {
-  const privilegeDocs = Math.round(docCount * privilegeFraction);
-  const keyDocs = Math.round(docCount * 0.02);
-
-  const seniorHours = Math.ceil(docCount / 100_000) * 5;
-  const partnerHours = Math.ceil(docCount / 250_000) * 3;
-
-  const roleHours: RoleHours = {
-    contractAttorney: 0,
-    juniorAssociate: 0,
-    seniorAssociate: seniorHours,
-    partner: partnerHours,
-  };
-
-  const aiProcessingCost =
-    docCount * AI_PROCESSING_RATES.initial +
-    privilegeDocs * AI_PROCESSING_RATES.privilege +
-    privilegeDocs * AI_PROCESSING_RATES.privilegeLog +
-    keyDocs * AI_PROCESSING_RATES.keyDocId;
-
-  const roleCosts: Record<StaffingRole, number> = {
-    contractAttorney: 0,
-    juniorAssociate: 0,
-    seniorAssociate: roleHours.seniorAssociate * rates.seniorAssociate,
-    partner: roleHours.partner * rates.partner,
-  };
-
-  const totalCost =
-    Object.values(roleCosts).reduce((s, c) => s + c, 0) + aiProcessingCost;
-  const totalHours = Object.values(roleHours).reduce((s, h) => s + h, 0);
-
-  return { roleCosts, roleHours, aiProcessingCost, totalHours, totalCost };
-}
-
 // ---------------------------------------------------------------------------
 // InlineNumberInput — click-to-edit pattern (from StaffingDrilldown)
 // ---------------------------------------------------------------------------

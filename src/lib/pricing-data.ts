@@ -320,47 +320,6 @@ export const CORPUS_MIXES: Record<CorpusMix['id'], CorpusMix> = {
 };
 
 // ---------------------------------------------------------------------------
-// Recall benchmarks (informational, not used in cost math)
-// ---------------------------------------------------------------------------
-
-export interface RecallBenchmark {
-  method: string;
-  recallLow: number;
-  recallHigh: number;
-  source: keyof typeof SOURCES;
-  note?: string;
-}
-
-export const RECALL_BENCHMARKS: RecallBenchmark[] = [
-  {
-    method: 'Manual (human) review',
-    recallLow: 60,
-    recallHigh: 70,
-    source: 'GROSSMAN_CORMACK_2011',
-    note: 'Even a hypothetical perfect human assessor reaches only ~70% recall. Roughly one in three relevant documents missed entirely.',
-  },
-  {
-    method: 'TAR 1.0 (batch training)',
-    recallLow: 75,
-    recallHigh: 80,
-    source: 'EDRM_2024',
-  },
-  {
-    method: 'TAR 2.0 / CAL',
-    recallLow: 85,
-    recallHigh: 95,
-    source: 'EDRM_2024',
-  },
-  {
-    method: 'GenAI-assisted review',
-    recallLow: 90,
-    recallHigh: 98,
-    source: 'EDRM_2024',
-    note: 'Vendor-reported. Independent benchmarking at the rigor of the TREC Legal Track studies has not yet caught up.',
-  },
-];
-
-// ---------------------------------------------------------------------------
 // Defaults
 // ---------------------------------------------------------------------------
 
