@@ -1047,21 +1047,29 @@ export function ClientInsights({
             </ul>
           </div>
 
-          {/* Efficiency Gains */}
+          {/* Time Savings & Strategic Advantage */}
           <div>
-            <h4 className="font-semibold text-sm mb-2">Efficiency Gains</h4>
+            <h4 className="font-semibold text-sm mb-2">Time Savings & Getting to Strategy Faster</h4>
             <ul className="space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
-                <span><strong>Faster case resolution.</strong> Complete document review {speedImprovement}% faster, getting to case merits sooner.</span>
+                <span><strong>{speedImprovement}% fewer human hours.</strong> Review that takes {Math.round(traditionalHours).toLocaleString()} hours traditionally completes in {Math.round(aiHumanHours).toLocaleString()} hours with AI — freeing {Math.round(traditionalHours - aiHumanHours).toLocaleString()} hours of attorney time.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
-                <span><strong>24/7 processing.</strong> AI works around the clock — no delays for nights, weekends, or holidays.</span>
+                <span><strong>Get to case merits sooner.</strong> When document review finishes in weeks instead of months, your legal team pivots to depositions, motions, and settlement strategy while the other side is still reviewing.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
-                <span><strong>Consistent quality.</strong> AI doesn't have off days, fatigue, or attention lapses.</span>
+                <span><strong>Key documents surface earlier.</strong> AI flags hot documents and privilege issues across the full corpus on day one — attorneys focus on the documents that matter instead of waiting for linear review to reach them.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5 shrink-0">•</span>
+                <span><strong>24/7 processing.</strong> AI works around the clock. No delays for nights, weekends, holidays, or reviewer fatigue — the corpus is processed while your team sleeps.</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-primary mt-0.5 shrink-0">•</span>
+                <span><strong>Faster supplemental productions.</strong> When new custodians or document sources appear mid-case, AI processes the incremental corpus in hours, not weeks of re-staffing.</span>
               </li>
             </ul>
           </div>
