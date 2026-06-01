@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Scale, Share2, RotateCcw, Check } from 'lucide-react';
+import { Scale, Share2, RotateCcw, Check, Github } from 'lucide-react';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
 import { TaskCalculator, ClientInsights, computeTraditionalCosts, computeAiCosts } from '@/components/TaskCalculator';
@@ -59,12 +59,21 @@ export function CostModelerPage() {
               <Scale className="h-5 w-5" />
               <span>eDiscovery Cost Calculator</span>
             </div>
-            <a
-              href="https://legalhack.io"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              &larr; LegalHack
-            </a>
+            <div className="flex items-center gap-3">
+              <a
+                href="https://github.com/legalrealist/cost-modeler"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+                title="View source on GitHub"
+              >
+                <Github className="h-4 w-4" />
+              </a>
+              <a
+                href="https://legalhack.io"
+                className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+              >
+                &larr; LegalHack
+              </a>
+            </div>
           </div>
         </header>
 
