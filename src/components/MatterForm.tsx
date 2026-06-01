@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import type { MatterInputs } from '@/lib/calculator';
+import type { RiskProfile } from '@/lib/rate-overrides';
 import { CORPUS_MIXES } from '@/lib/pricing-data';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -13,17 +14,24 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 interface MatterFormProps {
   inputs: MatterInputs;
   onChange: (partial: Partial<MatterInputs>) => void;
   onChangeGigabytes: (gb: number) => void;
+  riskProfile: RiskProfile;
+  presetRiskProfile: RiskProfile;
+  isCustomProfile: boolean;
+  onUpdateRiskProfile: (updater: (prev: RiskProfile) => RiskProfile) => void;
+  onResetRiskProfile: () => void;
 }
 
 const DOC_PRESETS = [250_000, 500_000, 750_000, 1_000_000, 1_500_000, 2_000_000];
 
-export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormProps) {
+export function MatterForm({ inputs, onChange, onChangeGigabytes, riskProfile, presetRiskProfile, isCustomProfile, onUpdateRiskProfile, onResetRiskProfile }: MatterFormProps) {
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const docPresetValue = useMemo(() => {
     const match = DOC_PRESETS.find(p => p === inputs.documentCount);
@@ -164,6 +172,113 @@ export function MatterForm({ inputs, onChange, onChangeGigabytes }: MatterFormPr
             </SelectContent>
           </Select>
         </div>
+
+        {/* Risk profile editor */}
+        <button
+          type="button"
+          onClick={() => setProfileOpen(!profileOpen)}
+          className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          {profileOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          Risk profile
+          <Badge variant={isCustomProfile ? 'default' : 'secondary'} className="text-[10px] px-1.5 py-0 ml-1">
+            {riskProfile.label}
+          </Badge>
+        </button>
+
+        {profileOpen && (
+          <div className="space-y-3 pl-5 border-l-2 border-secondary">
+            {isCustomProfile && (
+              <button
+                type="button"
+                onClick={onResetRiskProfile}
+                className="text-xs text-primary hover:underline"
+              >
+                Reset to {presetRiskProfile.label} preset
+              </button>
+            )}
+
+            <div>
+              <Label className="text-xs font-medium">QC sampling rates</Label>
+              <p className="text-[10px] text-muted-foreground mb-1.5">
+                What % of first-level work gets second-level quality control
+              </p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  ['review', 'Review'],
+                  ['privilege', 'Privilege'],
+                  ['privilegeLog', 'Priv log'],
+                  ['keyDoc', 'Key doc'],
+                ] as const).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <Label className="text-[10px] text-muted-foreground w-14 shrink-0">{label}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={Math.round(riskProfile.qcRatios[key] * 100)}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
+                        onUpdateRiskProfile((p) => ({ ...p, qcRatios: { ...p.qcRatios, [key]: v } }));
+                      }}
+                      className="h-7 text-xs w-16"
+                    />
+                    <span className="text-[10px] text-muted-foreground">%</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <Label className="text-xs font-medium">Junior / senior allocation</Label>
+              <p className="text-[10px] text-muted-foreground mb-1.5">
+                How QC hours split between junior and senior associates
+              </p>
+              <div className="space-y-1.5">
+                {([
+                  ['volumeQC', 'Volume QC'],
+                  ['privilegeQC', 'Privilege QC'],
+                  ['keyDocQC', 'Key doc QC'],
+                ] as const).map(([key, label]) => (
+                  <div key={key} className="flex items-center gap-1.5">
+                    <Label className="text-[10px] text-muted-foreground w-20 shrink-0">{label}</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={100}
+                      step={5}
+                      value={Math.round(riskProfile.juniorFraction[key] * 100)}
+                      onChange={(e) => {
+                        const v = Math.max(0, Math.min(100, Number(e.target.value))) / 100;
+                        onUpdateRiskProfile((p) => ({ ...p, juniorFraction: { ...p.juniorFraction, [key]: v } }));
+                      }}
+                      className="h-7 text-xs w-16"
+                    />
+                    <span className="text-[10px] text-muted-foreground">% jr</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <Label className="text-[10px] text-muted-foreground w-20 shrink-0">Partner ×</Label>
+              <Input
+                type="number"
+                min={0}
+                max={5}
+                step={0.5}
+                value={riskProfile.partnerInvolvement}
+                onChange={(e) => {
+                  const v = Math.max(0, Math.min(5, Number(e.target.value)));
+                  onUpdateRiskProfile((p) => ({ ...p, partnerInvolvement: v }));
+                }}
+                className="h-7 text-xs w-16"
+              />
+              <span className="text-[10px] text-muted-foreground">key doc multiplier</span>
+            </div>
+          </div>
+        )}
 
         {/* Privilege */}
         <div className="space-y-3">

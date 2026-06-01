@@ -7,6 +7,7 @@ import {
   DEFAULT_ROLE_RATES,
   getDefaultTaskHours,
   getRiskProfile,
+  type RiskProfile,
   type TaskHoursState,
   type StaffingRole,
   type RiskMatterType,
@@ -112,11 +113,25 @@ export function useMatterInputs() {
   const [taskHoursOverride, setTaskHoursOverrideState] = useState<TaskHoursState | null>(null);
   const [aiEfficiencyOverride, setAiEfficiencyOverride] = useState<number | undefined>(undefined);
   const [managedReviewShift, setManagedReviewShift] = useState(0.30);
+  const [customRiskProfile, setCustomRiskProfile] = useState<RiskProfile | null>(null);
 
-  const riskProfile = getRiskProfile(
+  const presetRiskProfile = getRiskProfile(
     inputs.matterType as RiskMatterType,
     inputs.defensibility as RiskDefensibility,
   );
+  const riskProfile = customRiskProfile ?? presetRiskProfile;
+
+  const updateRiskProfileField = useCallback((updater: (prev: RiskProfile) => RiskProfile) => {
+    setCustomRiskProfile((prev) => {
+      const base = prev ?? presetRiskProfile;
+      const next = updater(base);
+      return { ...next, label: 'Custom' };
+    });
+  }, [presetRiskProfile]);
+
+  const resetRiskProfile = useCallback(() => {
+    setCustomRiskProfile(null);
+  }, []);
 
   const privilegeCount = inputs.privilegeRequired
     ? Math.round(inputs.documentCount * inputs.privilegeFraction)
@@ -149,6 +164,7 @@ export function useMatterInputs() {
     setTaskHoursOverrideState(null);
     setAiEfficiencyOverride(undefined);
     setManagedReviewShift(0.30);
+    setCustomRiskProfile(null);
   }, []);
 
   const reset = useCallback(() => {
@@ -157,6 +173,7 @@ export function useMatterInputs() {
     setTaskHoursOverrideState(null);
     setAiEfficiencyOverride(undefined);
     setManagedReviewShift(0.30);
+    setCustomRiskProfile(null);
   }, []);
 
   return {
@@ -167,6 +184,10 @@ export function useMatterInputs() {
     setRoleRate,
     taskHours,
     riskProfile,
+    presetRiskProfile,
+    isCustomProfile: customRiskProfile !== null,
+    updateRiskProfileField,
+    resetRiskProfile,
     aiEfficiencyOverride,
     setAiEfficiencyOverride,
     managedReviewShift,

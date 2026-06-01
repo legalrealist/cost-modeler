@@ -15,6 +15,10 @@ export function CostModelerPage() {
     setRoleRate,
     taskHours,
     riskProfile,
+    presetRiskProfile,
+    isCustomProfile,
+    updateRiskProfileField,
+    resetRiskProfile,
     aiEfficiencyOverride,
     setAiEfficiencyOverride,
     managedReviewShift,
@@ -98,6 +102,11 @@ export function CostModelerPage() {
                   inputs={inputs}
                   onChange={(p) => setInputs(p)}
                   onChangeGigabytes={setGigabytes}
+                  riskProfile={riskProfile}
+                  presetRiskProfile={presetRiskProfile}
+                  isCustomProfile={isCustomProfile}
+                  onUpdateRiskProfile={updateRiskProfileField}
+                  onResetRiskProfile={resetRiskProfile}
                 />
                 <div className="flex gap-2">
                   <Button variant="outline" size="sm" onClick={handleShare} className="flex-1">
