@@ -7,7 +7,20 @@ import {
   type StaffingRole,
   type RiskProfile,
 } from '@/lib/rate-overrides';
-import { AI_PROCESSING_RATES } from '@/lib/pricing-data';
+import {
+  computeTraditionalCosts,
+  computeAiCosts,
+  computeSavings,
+  computeTimeline,
+  computeTraditionalTotalHours,
+  formatCurrency,
+  type CostBreakdown,
+  type TraditionalTaskHours,
+  type AiTaskHours,
+} from '@/lib/calculations';
+
+export type { CostBreakdown } from '@/lib/calculations';
+export { computeTraditionalCosts, computeAiCosts } from '@/lib/calculations';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -15,24 +28,6 @@ import { cn } from '@/lib/utils';
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
-
-export interface TraditionalTaskHours {
-  initialReview: number;
-  secondLevelReview: number;
-  privilegeReview: number;
-  secondLevelPrivilegeReview: number;
-  privilegeLogDrafting: number;
-  secondLevelPrivilegeLogDrafting: number;
-  keyDocIdentification: number;
-  secondLevelKeyDocIdentification: number;
-}
-
-export interface AiTaskHours {
-  secondLevelReview: number;
-  secondLevelPrivilegeReview: number;
-  secondLevelPrivilegeLogDrafting: number;
-  secondLevelKeyDocIdentification: number;
-}
 
 export interface TaskCalculatorProps {
   docCount: number;
@@ -62,116 +57,6 @@ const ROLE_ORDER: StaffingRole[] = [
   'seniorAssociate',
   'partner',
 ];
-
-// ---------------------------------------------------------------------------
-// Cost computation helpers
-// ---------------------------------------------------------------------------
-
-interface RoleHours {
-  contractAttorney: number;
-  juniorAssociate: number;
-  seniorAssociate: number;
-  partner: number;
-}
-
-export interface CostBreakdown {
-  roleCosts: Record<StaffingRole, number>;
-  roleHours: RoleHours;
-  aiProcessingCost: number;
-  totalHours: number;
-  totalCost: number;
-}
-
-export function computeTraditionalCosts(
-  t: TraditionalTaskHours,
-  rates: Record<StaffingRole, number>,
-  riskProfile: RiskProfile,
-): CostBreakdown {
-  const jf = riskProfile.juniorFraction;
-  const roleHours: RoleHours = {
-    contractAttorney:
-      t.initialReview + t.privilegeReview + t.privilegeLogDrafting,
-    juniorAssociate:
-      t.secondLevelReview * jf.volumeQC +
-      t.secondLevelPrivilegeReview * jf.privilegeQC +
-      t.secondLevelPrivilegeLogDrafting * jf.privilegeQC +
-      t.secondLevelKeyDocIdentification * jf.keyDocQC,
-    seniorAssociate:
-      t.secondLevelReview * (1 - jf.volumeQC) +
-      t.secondLevelPrivilegeReview * (1 - jf.privilegeQC) +
-      t.secondLevelPrivilegeLogDrafting * (1 - jf.privilegeQC) +
-      t.secondLevelKeyDocIdentification * (1 - jf.keyDocQC) +
-      t.keyDocIdentification * 0.5,
-    partner: t.keyDocIdentification * 0.5 * riskProfile.partnerInvolvement,
-  };
-
-  const roleCosts: Record<StaffingRole, number> = {
-    contractAttorney: roleHours.contractAttorney * rates.contractAttorney,
-    juniorAssociate: roleHours.juniorAssociate * rates.juniorAssociate,
-    seniorAssociate: roleHours.seniorAssociate * rates.seniorAssociate,
-    partner: roleHours.partner * rates.partner,
-  };
-
-  const totalCost = Object.values(roleCosts).reduce((s, c) => s + c, 0);
-  const totalHours = Object.values(roleHours).reduce((s, h) => s + h, 0);
-
-  return { roleCosts, roleHours, aiProcessingCost: 0, totalHours, totalCost };
-}
-
-export function computeAiCosts(
-  a: AiTaskHours,
-  rates: Record<StaffingRole, number>,
-  riskProfile: RiskProfile,
-  docCount: number,
-  privilegeFraction = 0.08,
-  managedReviewShift = 0,
-  aiEfficiencyOverride?: number,
-): CostBreakdown {
-  const privilegeDocs = Math.round(docCount * privilegeFraction);
-  const keyDocs = Math.round(docCount * 0.02);
-  const eff = aiEfficiencyOverride ?? riskProfile.aiEfficiency;
-  const jf = riskProfile.juniorFraction;
-
-  const rawJuniorVolumeQC = a.secondLevelReview * jf.volumeQC * eff;
-  const shiftedToManagedReview = rawJuniorVolumeQC * managedReviewShift;
-
-  const juniorHours =
-    (rawJuniorVolumeQC - shiftedToManagedReview) +
-    (a.secondLevelPrivilegeReview * jf.privilegeQC +
-      a.secondLevelPrivilegeLogDrafting * jf.privilegeQC +
-      a.secondLevelKeyDocIdentification * jf.keyDocQC) * eff;
-  const seniorHours =
-    (a.secondLevelReview * (1 - jf.volumeQC) +
-      a.secondLevelPrivilegeReview * (1 - jf.privilegeQC) +
-      a.secondLevelPrivilegeLogDrafting * (1 - jf.privilegeQC) +
-      a.secondLevelKeyDocIdentification * (1 - jf.keyDocQC)) * eff;
-
-  const roleHours: RoleHours = {
-    contractAttorney: shiftedToManagedReview,
-    juniorAssociate: juniorHours,
-    seniorAssociate: seniorHours,
-    partner: a.secondLevelKeyDocIdentification * 0.5 * riskProfile.partnerInvolvement,
-  };
-
-  const aiProcessingCost =
-    docCount * AI_PROCESSING_RATES.initial +
-    privilegeDocs * AI_PROCESSING_RATES.privilege +
-    privilegeDocs * AI_PROCESSING_RATES.privilegeLog +
-    keyDocs * AI_PROCESSING_RATES.keyDocId;
-
-  const roleCosts: Record<StaffingRole, number> = {
-    contractAttorney: roleHours.contractAttorney * rates.contractAttorney,
-    juniorAssociate: roleHours.juniorAssociate * rates.juniorAssociate,
-    seniorAssociate: roleHours.seniorAssociate * rates.seniorAssociate,
-    partner: roleHours.partner * rates.partner,
-  };
-
-  const totalCost =
-    Object.values(roleCosts).reduce((s, c) => s + c, 0) + aiProcessingCost;
-  const totalHours = Object.values(roleHours).reduce((s, h) => s + h, 0);
-
-  return { roleCosts, roleHours, aiProcessingCost, totalHours, totalCost };
-}
 
 // ---------------------------------------------------------------------------
 // InlineNumberInput — click-to-edit pattern (from StaffingDrilldown)
@@ -491,21 +376,11 @@ export function TaskCalculator({
     () => computeAiCosts(a, roleRates, riskProfile, docCount, privilegeFraction, managedReviewShift, aiEfficiencyOverride),
     [a, roleRates, riskProfile, docCount, privilegeFraction, managedReviewShift, aiEfficiencyOverride],
   );
-  const savings = traditionalBreakdown.totalCost - aiBreakdown.totalCost;
-  const savingsPct =
-    traditionalBreakdown.totalCost > 0
-      ? (savings / traditionalBreakdown.totalCost) * 100
-      : 0;
+  const { amount: savings, percentage: savingsPct } = computeSavings(
+    traditionalBreakdown.totalCost, aiBreakdown.totalCost
+  );
 
-  const traditionalTotalHours =
-    t.initialReview +
-    t.secondLevelReview +
-    t.privilegeReview +
-    t.secondLevelPrivilegeReview +
-    t.privilegeLogDrafting +
-    t.secondLevelPrivilegeLogDrafting +
-    t.keyDocIdentification +
-    t.secondLevelKeyDocIdentification;
+  const traditionalTotalHours = computeTraditionalTotalHours(t);
 
   const aiTotalHumanHours =
     aiBreakdown.roleHours.contractAttorney +
@@ -515,11 +390,8 @@ export function TaskCalculator({
 
   const effBadge = eff < 1.0 ? `${Math.round((1 - eff) * 100)}% faster` : undefined;
 
-  const availableHours = weeks * REVIEWERS * WORK_WEEK_HOURS;
-  const traditionalWeeksNeeded = Math.ceil(traditionalTotalHours / (REVIEWERS * WORK_WEEK_HOURS));
-  const aiWeeksNeeded = Math.ceil(aiTotalHumanHours / (REVIEWERS * WORK_WEEK_HOURS));
-  const traditionalFeasible = traditionalTotalHours <= availableHours;
-  const aiFeasible = aiTotalHumanHours <= availableHours;
+  const timeline = computeTimeline(traditionalTotalHours, aiTotalHumanHours, weeks, REVIEWERS, WORK_WEEK_HOURS);
+  const { traditionalWeeksNeeded, aiWeeksNeeded, traditionalFeasible, aiFeasible } = timeline;
 
   return (
     <div className="space-y-6">
@@ -1034,7 +906,7 @@ export function ClientInsights({
             <ul className="space-y-2">
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
-                <span><strong>Lower legal bills.</strong> Document review costs drop from {fmt(traditionalBreakdown.totalCost)} to {fmt(aiBreakdown.totalCost)} with AI-enhanced review.</span>
+                <span><strong>Lower legal bills.</strong> Document review costs drop from {formatCurrency(traditionalBreakdown.totalCost)} to {formatCurrency(aiBreakdown.totalCost)} with AI-enhanced review.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="text-primary mt-0.5 shrink-0">•</span>
@@ -1224,11 +1096,11 @@ function KeyTakeaways({
 
   if (savings > 0) {
     insights.push(
-      `AI-enhanced workflow saves ${fmt(savings)} (${savingsPct.toFixed(0)}%) compared to traditional review.`
+      `AI-enhanced workflow saves ${formatCurrency(savings)} (${savingsPct.toFixed(0)}%) compared to traditional review.`
     );
   } else if (savings < 0) {
     insights.push(
-      `Traditional workflow is ${fmt(Math.abs(savings))} cheaper — AI overhead exceeds efficiency gains at this configuration.`
+      `Traditional workflow is ${formatCurrency(Math.abs(savings))} cheaper — AI overhead exceeds efficiency gains at this configuration.`
     );
   }
 
@@ -1242,13 +1114,13 @@ function KeyTakeaways({
     const [role, cost] = biggestTraditionalRole;
     const pct = (cost / traditionalCost) * 100;
     insights.push(
-      `${STAFFING_ROLE_LABELS[role]} costs drive ${pct.toFixed(0)}% of the traditional budget (${fmt(cost)}).`
+      `${STAFFING_ROLE_LABELS[role]} costs drive ${pct.toFixed(0)}% of the traditional budget (${formatCurrency(cost)}).`
     );
   }
 
   if (aiProcessingCost > 0) {
     insights.push(
-      `AI processing adds only ${fmt(aiProcessingCost)} (${aiProcessingPct.toFixed(1)}% of AI-enhanced total) — the real cost is still human QC.`
+      `AI processing adds only ${formatCurrency(aiProcessingCost)} (${aiProcessingPct.toFixed(1)}% of AI-enhanced total) — the real cost is still human QC.`
     );
   }
 
@@ -1256,11 +1128,11 @@ function KeyTakeaways({
     if (aiBreakdown.roleCosts.contractAttorney > 0) {
       const shiftSavings = aiBreakdown.roleHours.contractAttorney * 750 - aiBreakdown.roleCosts.contractAttorney;
       insights.push(
-        `AI pre-screening frees ${Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs of volume QC for managed review ($50/hr vs $750/hr), saving ${fmt(shiftSavings)} while associates focus on nuanced judgment work.`
+        `AI pre-screening frees ${Math.round(aiBreakdown.roleHours.contractAttorney).toLocaleString()} hrs of volume QC for managed review ($50/hr vs $750/hr), saving ${formatCurrency(shiftSavings)} while associates focus on nuanced judgment work.`
       );
     } else {
       insights.push(
-        `AI automates all document processing (${fmt(traditionalBreakdown.roleCosts.contractAttorney)} saved), freeing attorneys entirely for judgment-intensive tasks.`
+        `AI automates all document processing (${formatCurrency(traditionalBreakdown.roleCosts.contractAttorney)} saved), freeing attorneys entirely for judgment-intensive tasks.`
       );
     }
   }
@@ -1290,10 +1162,4 @@ function KeyTakeaways({
       </CardContent>
     </Card>
   );
-}
-
-function fmt(n: number): string {
-  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `$${Math.round(n / 1_000).toLocaleString('en-US')}K`;
-  return `$${Math.round(n).toLocaleString('en-US')}`;
 }

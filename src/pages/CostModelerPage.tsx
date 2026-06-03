@@ -2,7 +2,8 @@ import { useState, useMemo } from 'react';
 import { Scale, Share2, RotateCcw, Check, Github } from 'lucide-react';
 import { useMatterInputs, buildShareUrl } from '@/lib/use-inputs';
 import { MatterForm } from '@/components/MatterForm';
-import { TaskCalculator, ClientInsights, computeTraditionalCosts, computeAiCosts } from '@/components/TaskCalculator';
+import { TaskCalculator, ClientInsights } from '@/components/TaskCalculator';
+import { computeTraditionalCosts, computeAiCosts, computeTraditionalTotalHours } from '@/lib/calculations';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 
@@ -39,7 +40,7 @@ export function CostModelerPage() {
     () => computeAiCosts(taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac, managedReviewShift, aiEfficiencyOverride),
     [taskHours.ai, roleRates, riskProfile, inputs.documentCount, privFrac, managedReviewShift, aiEfficiencyOverride],
   );
-  const traditionalTotalHours = Object.values(taskHours.traditional).reduce((s, h) => s + h, 0);
+  const traditionalTotalHours = computeTraditionalTotalHours(taskHours.traditional);
   const aiTotalHumanHours = aiBreakdown.roleHours.contractAttorney + aiBreakdown.roleHours.juniorAssociate + aiBreakdown.roleHours.seniorAssociate + aiBreakdown.roleHours.partner;
 
   const handleShare = async () => {
