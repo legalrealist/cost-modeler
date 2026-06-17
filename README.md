@@ -6,6 +6,8 @@ AI handles document processing (initial review, privilege screening, privilege l
 
 **[Try it live →](https://legalhack.io/budget/)** | Companion to the [LegalRealist AI Landscape](https://legalrealist.ai) series
 
+![The eDiscovery cost calculator: matter inputs, traditional vs AI-enhanced task allocation, adjustable AI-efficiency and managed-review sliders, and a side-by-side cost comparison](assets/screenshot.png)
+
 ## What you can model
 
 **Two workflows side by side:**
